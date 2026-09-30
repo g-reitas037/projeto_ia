@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Organiza+ — Assistente Financeiro Inteligente</title>
+  <meta name="description" content="Converse com a Inteligência Financeira da Organiza+ para tirar dúvidas sobre orçamento, limites de gastos e investimentos.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="chat.css">
+</head>
+<body>
+
+  <!-- Overlay para fechar sidebar no celular -->
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <div class="chat-app-container">
+
+    <!-- ==========================================================
+         CANTO ESQUERDO: BARRA LATERAL (CONFIGURAÇÕES & PERFIL)
+         ========================================================== -->
+    <aside class="chat-sidebar" id="chat-sidebar">
+      
+      <!-- Topo: Marca e Fechar no mobile -->
+      <div class="sidebar-header">
+        <div class="sidebar-logo">
+          <a href="index.html" title="Voltar à página inicial">
+            <h2>Organiza <span>+</span></h2>
+          </a>
+        </div>
+        <button type="button" class="btn-sidebar-close" id="btn-sidebar-close" aria-label="Fechar menu lateral">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Corpo da Sidebar -->
+      <div class="sidebar-body">
+
+        <!-- 1. Perfil Clicável (leva à página do perfil) -->
+        <div>
+          <div class="sidebar-section-title">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+            Seu Perfil
+          </div>
+
+          <a href="index.html#perfil" class="user-profile-card" id="btn-sidebar-profile" title="Clique para editar seu perfil completo">
+            <div class="user-profile-header">
+              <div class="user-avatar-large" id="sidebar-user-avatar">
+                <!-- Iniciais ou foto carregadas via JS -->
+              </div>
+              <div class="user-meta">
+                <div class="user-name" id="sidebar-user-name">Carregando...</div>
+                <div class="user-email" id="sidebar-user-email">email@exemplo.com</div>
+                <span class="badge-perfil" id="sidebar-user-badge">Conservador</span>
+              </div>
+            </div>
+
+            <div class="user-profile-footer">
+              <span class="dica-campo">Dados & Preferências</span>
+              <span class="btn-edit-profile-badge">
+                Editar Perfil
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M5 12h14M12 5l7 7-7 7"/>
+                </svg>
+              </span>
+            </div>
+          </a>
+        </div>
+
+        <!-- 2. Resumo Financeiro Dinâmico -->
+        <div>
+          <div class="sidebar-section-title">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+              <line x1="2" y1="10" x2="22" y2="10"></line>
+            </svg>
+            Diagnóstico das Finanças
+          </div>
+
+          <div class="finance-metrics-card" id="finance-snapshot-card">
+            <div class="metric-row">
+              <span class="metric-label">Renda Mensal:</span>
+              <span class="metric-val" id="sb-renda">R$ 0,00</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">Gastos Fixos:</span>
+              <span class="metric-val" id="sb-gastos">R$ 0,00</span>
+            </div>
+            <div class="metric-divider"></div>
+            <div class="metric-row">
+              <span class="metric-label">Margem Livre:</span>
+              <span class="metric-val destaque-positivo" id="sb-margem">R$ 0,00</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">Teto de Gastos Livres:</span>
+              <span class="metric-val" id="sb-teto">R$ 0,00</span>
+            </div>
+
+            <!-- Aviso caso ainda não tenha preenchido renda ou gastos -->
+            <div class="metric-warning-alert" id="sb-alerta-preenchimento" hidden>
+              💡 Complete seus ganhos e gastos no perfil para respostas 100% calibradas!
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Configurações do Assistente -->
+        <div>
+          <div class="sidebar-section-title">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+            Configurações da IA
+          </div>
+
+          <div class="settings-group">
+            <div class="setting-item">
+              <label for="select-tom">Tom de Resposta:</label>
+              <select id="select-tom">
+                <option value="direto" selected>Prático e Direto (foco em números)</option>
+                <option value="educativo">Educativo e Didático (com explicações)</option>
+                <option value="estrategico">Estratégico (visão de longo prazo)</option>
+              </select>
+            </div>
+
+            <div class="setting-item">
+              <label for="select-foco">Prioridade da Conversa:</label>
+              <select id="select-foco">
+                <option value="equilibrado" selected>Equilíbrio (Gastos + Poupança)</option>
+                <option value="economia">Redução Agressiva de Custos</option>
+                <option value="investimento">Aceleração de Investimentos</option>
+              </select>
+            </div>
+
+            <button type="button" class="btn-sidebar-action" id="btn-limpar-chat">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+              Limpar histórico da conversa
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Rodapé da Sidebar: Tema e Sair -->
+      <div class="sidebar-footer">
+        <!-- Botão de alternar tema com transição suave do Sol para a Lua -->
+        <button id="theme-toggle" class="btn-arredondado btn-tema" aria-label="Alternar tema de cores" title="Alternar tema">
+          <div class="theme-icon-container">
+            <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="5"></circle>
+              <line x1="12" y1="1" x2="12" y2="3"></line>
+              <line x1="12" y1="21" x2="12" y2="23"></line>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+              <line x1="1" y1="12" x2="3" y2="12"></line>
+              <line x1="21" y1="12" x2="23" y2="12"></line>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+            </svg>
+            <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+            </svg>
+          </div>
+        </button>
+
+        <button type="button" class="btn-logout-sidebar" id="btn-logout">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+          Sair da Conta
+        </button>
+      </div>
+
+    </aside>
+
+    <!-- ==========================================================
+         ÁREA PRINCIPAL: CONVERSA DO CHATBOT
+         ========================================================== -->
+    <main class="chat-main">
+
+      <!-- Header Superior do Chat -->
+      <header class="chat-main-header">
+        <div class="chat-header-info">
+          <!-- Botão para abrir menu no mobile -->
+          <button type="button" class="btn-menu-mobile" id="btn-toggle-sidebar" aria-label="Abrir configurações e perfil">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+
+          <div class="chat-bot-avatar">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+            </svg>
+          </div>
+
+          <div class="chat-bot-titles">
+            <h3>Organiza+ IA</h3>
+            <span class="status-badge">
+              <span class="status-dot"></span>
+              Online • Conectada ao seu perfil
+            </span>
+          </div>
+        </div>
+
+        <div class="chat-header-actions">
+          <a href="index.html#perfil" class="btn-arredondado btn-usuario" id="header-btn-perfil" title="Abrir edição do perfil">
+            <span class="mini-avatar" id="header-avatar"></span>
+            <span id="header-user-nome">Perfil</span>
+          </a>
+        </div>
+      </header>
+
+      <!-- Fluxo de Mensagens -->
+      <div class="chat-messages-container" id="chat-messages" role="log" aria-live="polite">
+
+        <!-- Boas-vindas Inicial -->
+        <div class="chat-welcome-banner" id="chat-welcome">
+          <h2>Olá, <span id="welcome-user-name">Organizador</span>! 👋</h2>
+          <p id="welcome-message-text">
+            Eu sou a inteligência artificial da <strong>Organiza+</strong>. Estou calibrada para analisar sua renda, seus gastos fixos e sugerir o melhor direcionamento para sua margem livre.
+          </p>
+
+          <div class="quick-prompts-label">Perguntas Rápidas Sugeridas:</div>
+          <div class="quick-prompts-grid" id="quick-prompts-container">
+            <button type="button" class="quick-chip" data-prompt="Qual é o meu teto de gastos livres para este mês?">
+              💰 Teto de gastos livres
+            </button>
+            <button type="button" class="quick-chip" data-prompt="Como devo alocar minha reserva e investimentos segundo o meu perfil?">
+              📈 Alocação recomendada
+            </button>
+            <button type="button" class="quick-chip" data-prompt="Quanto preciso ter guardado para a minha Reserva de Emergência?">
+              🛡️ Reserva de emergência
+            </button>
+            <button type="button" class="quick-chip" data-prompt="Quais são as melhores estratégias para eu cortar custos fixos?">
+              ✂️ Dicas para cortar gastos
+            </button>
+            <button type="button" class="quick-chip" data-prompt="Simule quanto consigo acumular em 6 e 12 meses guardando minha meta.">
+              🎯 Simulação de poupança
+            </button>
+          </div>
+        </div>
+
+        <!-- As mensagens enviadas e recebidas serão inseridas aqui dinamicamente -->
+
+      </div>
+
+      <!-- Barra de Digitação (Input) -->
+      <div class="chat-input-area">
+        <form class="chat-input-wrapper" id="chat-form">
+          <textarea
+            id="chat-input"
+            class="chat-textarea"
+            placeholder="Pergunte sobre seus limites de gastos, investimentos ou metas..."
+            rows="1"
+            required
+          ></textarea>
+
+          <button type="submit" class="chat-send-btn" id="chat-send-btn" aria-label="Enviar mensagem" title="Enviar">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          </button>
+        </form>
+
+        <div class="chat-input-disclaimer">
+          Dica: Pressione <strong>Enter</strong> para enviar e <strong>Shift + Enter</strong> para quebra de linha.
+        </div>
+      </div>
+
+    </main>
+
+  </div>
+
+  <!-- Toast de Notificações Rápidas -->
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="chat.js"></script>
+</body>
+</html>

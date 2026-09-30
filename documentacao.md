@@ -44,13 +44,21 @@ flowchart TD
     I --> J
     J --> K([Resposta ao usuario])
 
-    style A fill:#e8f1ff,stroke:#2563eb,stroke-width:2px
-    style B fill:#fff4d6,stroke:#d97706,stroke-width:2px
-    style C fill:#e8f8ee,stroke:#16a34a,stroke-width:2px
-    style D fill:#f3e8ff,stroke:#9333ea,stroke-width:2px
-    style E fill:#fef3c7,stroke:#ca8a04,stroke-width:2px
-    style J fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px
-    style K fill:#dcfce7,stroke:#15803d,stroke-width:2px
+    style R1 color:#000
+    style R2 color:#000
+    style R3 color:#000
+    style R4 color:#000
+    style A fill:#e8f1ff,stroke:#2563eb,stroke-width:2px,color:#000
+    style B fill:#fff4d6,stroke:#d97706,stroke-width:2px,color:#000
+    style C fill:#e8f8ee,stroke:#16a34a,stroke-width:2px,color:#000
+    style D fill:#f3e8ff,stroke:#9333ea,stroke-width:2px,color:#000
+    style E fill:#fef3c7,stroke:#ca8a04,stroke-width:2px,color:#000
+    style F color:#000
+    style G color:#000
+    style H color:#000
+    style I color:#000
+    style J fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#000
+    style K fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#000
 ```
 
 ### Etapas do fluxo
@@ -80,14 +88,16 @@ flowchart TD
     F --> G[Funcionalidades financeiras]
     G --> H([Graficos, comparacoes e plano de gastos])
 
-    style A fill:#e8f1ff,stroke:#2563eb,stroke-width:2px
-    style B fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px
-    style C fill:#fef3c7,stroke:#ca8a04,stroke-width:2px
-    style D fill:#dcfce7,stroke:#15803d,stroke-width:2px
-    style E fill:#fff4d6,stroke:#d97706,stroke-width:2px
-    style F fill:#f3e8ff,stroke:#9333ea,stroke-width:2px
-    style G fill:#e8f8ee,stroke:#16a34a,stroke-width:2px
-    style H fill:#dcfce7,stroke:#15803d,stroke-width:2px
+    style RS color:#000
+    style RN color:#000
+    style A fill:#e8f1ff,stroke:#2563eb,stroke-width:2px,color:#000
+    style B fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#000
+    style C fill:#fef3c7,stroke:#ca8a04,stroke-width:2px,color:#000
+    style D fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#000
+    style E fill:#fff4d6,stroke:#d97706,stroke-width:2px,color:#000
+    style F fill:#f3e8ff,stroke:#9333ea,stroke-width:2px,color:#000
+    style G fill:#e8f8ee,stroke:#16a34a,stroke-width:2px,color:#000
+    style H fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#000
 ```
 
 ### Etapas da jornada

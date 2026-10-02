@@ -1,11 +1,6 @@
 /**
  * Organiza+ - Tema, Cadastro/Login, Perfil editável, Diagnóstico e Tutorial guiado
- *
- * Fluxo do sistema:
- *   Cadastro (dados básicos) -> Perfil (renda, gastos, fotos) -> Diagnóstico
- *
- * Armazenamento: localStorage (é um protótipo). Em um sistema real, esses dados
- * ficariam em um back-end com banco de dados e a senha seria tratada no servidor.
+ * Integrado ao Supabase (Auth & Database)
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -57,9 +52,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const themeToggleBtn = $('theme-toggle');
   const htmlElement = document.documentElement;
 
-  // Carrega o tema salvo ou usa 'light' como padrão
   let temaSalvo = 'light';
-  try { temaSalvo = localStorage.getItem('aurafinance_theme') || 'light'; } catch (e) { /* segue com o padrão */ }
+  try { temaSalvo = localStorage.getItem('aurafinance_theme') || 'light'; } catch (e) { }
   htmlElement.setAttribute('data-theme', temaSalvo);
 
   themeToggleBtn.addEventListener('click', () => {
@@ -67,72 +61,52 @@ document.addEventListener('DOMContentLoaded', () => {
     const novoTema = temaAtual === 'dark' ? 'light' : 'dark';
 
     htmlElement.setAttribute('data-theme', novoTema);
-    try { localStorage.setItem('aurafinance_theme', novoTema); } catch (e) { /* ignora */ }
+    try { localStorage.setItem('aurafinance_theme', novoTema); } catch (e) { }
   });
 
   // ---------------------------------------------------------
-  // 2. PERSISTÊNCIA: CONTAS E SESSÃO
+  // 2. PERSISTÊNCIA: BANCO DE DADOS (SUPABASE)
   // ---------------------------------------------------------
-  const CHAVE_USUARIOS = 'organizamais_usuarios';
-  const CHAVE_SESSAO = 'organizamais_sessao';
+  async function getUsuarioAtual() {
+    const { data: { session } } = await _supabase.auth.getSession();
+    if (!session || !session.user) return null;
 
-  function lerUsuarios() {
-    try { return JSON.parse(localStorage.getItem(CHAVE_USUARIOS)) || {}; } catch (e) { return {}; }
+    const user = session.user;
+    const { data: perfil, error } = await _supabase
+      .from('perfis')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
+    if (error || !perfil) return null;
+
+    return {
+      id: user.id,
+      email: user.email,
+      nome: perfil.nome,
+      telefone: perfil.telefone,
+      perfil: perfil.perfil || 'moderado',
+      renda: perfil.renda != null ? Number(perfil.renda) : null,
+      gastosFixos: perfil.gastos_fixos != null ? Number(perfil.gastos_fixos) : null,
+      foto: perfil.foto,
+      capa: perfil.capa,
+      tutorialVisto: perfil.tutorial_visto
+    };
   }
 
-  function gravarUsuarios(todos) {
-    try { localStorage.setItem(CHAVE_USUARIOS, JSON.stringify(todos)); return true; } catch (e) { return false; }
-  }
+  async function atualizarPerfilSupabase(dados) {
+    const { data: { user } } = await _supabase.auth.getUser();
+    if (!user) return false;
 
-  function lerSessao() {
-    try { return localStorage.getItem(CHAVE_SESSAO); } catch (e) { return null; }
-  }
+    const { error } = await _supabase
+      .from('perfis')
+      .update({ ...dados, updated_at: new Date() })
+      .eq('id', user.id);
 
-  function gravarSessao(email) {
-    try {
-      if (email) localStorage.setItem(CHAVE_SESSAO, email);
-      else localStorage.removeItem(CHAVE_SESSAO);
-      return true;
-    } catch (e) { return false; }
-  }
-
-  function usuarioLogado() {
-    const email = lerSessao();
-    return email ? (lerUsuarios()[email] || null) : null;
-  }
-
-  // Mescla alterações no usuário logado. Retorna false se não conseguiu gravar.
-  function atualizarUsuario(alteracoes) {
-    const email = lerSessao();
-    const todos = lerUsuarios();
-    if (!email || !todos[email]) return false;
-    todos[email] = { ...todos[email], ...alteracoes };
-    return gravarUsuarios(todos);
-  }
-
-  // Senha nunca é guardada em texto puro: salvamos apenas um hash com "sal".
-  // (Em produção isso é feito no servidor com bcrypt/argon2.)
-  function gerarSal() {
-    const bytes = new Uint8Array(16);
-    if (window.crypto && crypto.getRandomValues) crypto.getRandomValues(bytes);
-    else bytes.forEach((_, i) => { bytes[i] = Math.floor(Math.random() * 256); });
-    return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
-  }
-
-  async function gerarHash(senha, sal) {
-    const texto = `${sal}:${senha}`;
-    if (window.crypto && crypto.subtle && window.TextEncoder) {
-      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(texto));
-      return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
-    }
-    // Alternativa simples para navegadores sem SubtleCrypto (apenas protótipo)
-    let h = 5381;
-    for (let i = 0; i < texto.length; i++) h = ((h << 5) + h + texto.charCodeAt(i)) >>> 0;
-    return `x${h.toString(16)}`;
+    return !error;
   }
 
   function iniciais(nome) {
-    // Considera só letras/números, ignorando símbolos e pontuação soltos no nome
     const partes = String(nome).trim().split(/\s+/)
       .map((p) => (p.match(/[\p{L}\p{N}]/u) || [''])[0])
       .filter(Boolean);
@@ -144,7 +118,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const primeiroNome = (nome) => String(nome).trim().split(/\s+/)[0] || '';
 
-  // Coloca a foto (ou as iniciais) dentro de um container de avatar
   function preencherAvatar(container, usuario, comAlt) {
     container.textContent = '';
     if (usuario.foto) {
@@ -190,9 +163,13 @@ document.addEventListener('DOMContentLoaded', () => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   }
 
-  function abrirPerfil() {
-    const usuario = usuarioLogado();
-    if (!usuario) { abrirModal('login'); return; }
+  async function abrirPerfil() {
+    const usuario = await getUsuarioAtual();
+    if (!usuario) {
+      mostrarView('home');
+      abrirModal('login');
+      return;
+    }
 
     renderizarCabecalho(usuario);
     preencherFormDados(usuario);
@@ -200,13 +177,21 @@ document.addEventListener('DOMContentLoaded', () => {
     renderizarDiagnostico(usuario);
     mostrarView('perfil');
 
-    // Primeira visita ao perfil (logo após o cadastro): mostra o tutorial
     if (!usuario.tutorialVisto) setTimeout(iniciarTutorial, 450);
   }
 
-  // Atualiza botões do topo e da página inicial conforme o usuário está logado ou não
-  function atualizarInterface() {
-    const usuario = usuarioLogado();
+  async function acaoPrincipal() {
+    const usuario = await getUsuarioAtual();
+    if (usuario) {
+      window.location.hash = 'perfil';
+      await abrirPerfil();
+    } else {
+      abrirModal('cadastro');
+    }
+  }
+
+  async function atualizarInterface() {
+    const usuario = await getUsuarioAtual();
     const logado = !!usuario;
 
     btnOpenCadastro.hidden = logado;
@@ -221,22 +206,24 @@ document.addEventListener('DOMContentLoaded', () => {
       btnPerfilTopo.setAttribute('aria-label', `Abrir perfil de ${usuario.nome}`);
     }
 
-    heroBtn.textContent = logado ? 'Acessar Chatbot IA' : 'Criar Cadastro';
-    btnCadastroInferior.textContent = logado ? 'Acessar Chatbot IA' : 'Cadastrar Perfil e Gerar Diagnóstico';
+    heroBtn.textContent = logado ? 'Acessar Meu Perfil' : 'Criar Cadastro';
+    btnCadastroInferior.textContent = logado ? 'Acessar Meu Perfil' : 'Cadastrar Perfil e Gerar Diagnóstico';
   }
 
-  // Botões de chamada para ação: cadastram (visitante) ou levam ao chatbot (logado)
-  function acaoPrincipal() {
-    if (usuarioLogado()) window.location.href = 'chat.html';
-    else abrirModal('cadastro');
+  if ($('logo-link')) {
+    $('logo-link').addEventListener('click', (e) => {
+      e.preventDefault();
+      window.location.hash = 'home';
+      mostrarView('home');
+    });
   }
 
-  $('logo-link').addEventListener('click', (e) => {
-    e.preventDefault();
-    mostrarView('home');
-  });
-
-  btnPerfilTopo.addEventListener('click', abrirPerfil);
+  if (btnPerfilTopo) {
+    btnPerfilTopo.addEventListener('click', async () => {
+      window.location.hash = 'perfil';
+      await abrirPerfil();
+    });
+  }
 
   // ---------------------------------------------------------
   // 5. MODAL DE CADASTRO / LOGIN
@@ -256,7 +243,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function abrirModal(aba) {
     trocarAba(aba || 'cadastro');
     modalCadastro.classList.add('ativo');
-    document.body.style.overflow = 'hidden'; // Impede rolagem de fundo com modal aberto
+    document.body.style.overflow = 'hidden';
     const primeiro = (aba === 'login' ? $('login-email') : $('nome'));
     setTimeout(() => primeiro.focus(), 60);
   }
@@ -273,12 +260,10 @@ document.addEventListener('DOMContentLoaded', () => {
   btnCadastroInferior.addEventListener('click', acaoPrincipal);
   btnCloseCadastro.addEventListener('click', fecharModal);
 
-  // Fecha ao clicar fora da janela
   modalCadastro.addEventListener('click', (e) => {
     if (e.target === modalCadastro) fecharModal();
   });
 
-  // Fechar com a tecla ESC
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && modalCadastro.classList.contains('ativo')) fecharModal();
   });
@@ -323,34 +308,22 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const todos = lerUsuarios();
-    if (todos[email]) {
-      mostrarErro(erroCadastro, 'Este e-mail já tem cadastro. Use a aba "Entrar" para acessar sua conta.');
-      return;
-    }
+    const { data, error } = await _supabase.auth.signUp({
+      email: email,
+      password: senha,
+      options: { data: { nome, telefone, perfil } }
+    });
 
-    const sal = gerarSal();
-    todos[email] = {
-      nome, email, telefone, perfil,
-      renda: null,          // preenchidos depois, na aba de perfil
-      gastosFixos: null,
-      foto: null,
-      capa: null,
-      tutorialVisto: false, // faz o tutorial aparecer na primeira visita ao perfil
-      sal,
-      senhaHash: await gerarHash(senha, sal),
-      criadoEm: Date.now()
-    };
-
-    if (!gravarUsuarios(todos) || !gravarSessao(email)) {
-      mostrarErro(erroCadastro, 'Não foi possível salvar seu cadastro. Verifique se o navegador permite armazenamento local.');
+    if (error) {
+      mostrarErro(erroCadastro, 'Erro no cadastro: ' + error.message);
       return;
     }
 
     formCadastro.reset();
     fecharModal();
-    atualizarInterface();
-    window.location.href = 'chat.html'; // Após criar a conta, vai direto para a interface do Chatbot
+    window.location.hash = 'perfil';
+    await atualizarInterface();
+    await abrirPerfil();
   });
 
   formLogin.addEventListener('submit', async (e) => {
@@ -359,26 +332,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const email = $('login-email').value.trim().toLowerCase();
     const senha = $('login-senha').value;
-    const usuario = lerUsuarios()[email];
 
-    // Mesma mensagem para e-mail inexistente e senha errada (não revela quais e-mails existem)
-    const hash = usuario ? await gerarHash(senha, usuario.sal) : null;
-    if (!usuario || hash !== usuario.senhaHash) {
-      mostrarErro(erroLogin, 'E-mail ou senha incorretos. Confira os dados e tente de novo.');
+    const { data, error } = await _supabase.auth.signInWithPassword({
+      email: email,
+      password: senha
+    });
+
+    if (error) {
+      mostrarErro(erroLogin, 'E-mail ou senha incorretos.');
       return;
     }
 
-    gravarSessao(email);
     formLogin.reset();
     fecharModal();
-    atualizarInterface();
-    window.location.href = 'chat.html'; // Após entrar na conta, vai direto para a interface do Chatbot
+    window.location.hash = 'perfil';
+    await atualizarInterface();
+    await abrirPerfil();
   });
 
-  $('btn-logout').addEventListener('click', () => {
-    encerrarTutorial(false);
-    gravarSessao(null);
-    atualizarInterface();
+  $('btn-logout').addEventListener('click', async () => {
+    await encerrarTutorial(false);
+    await _supabase.auth.signOut();
+    window.location.hash = 'home';
+    await atualizarInterface();
     mostrarView('home');
     mostrarToast('Você saiu da conta. Até logo!');
   });
@@ -391,8 +367,8 @@ document.addEventListener('DOMContentLoaded', () => {
       nome: 'Conservador',
       classeBadge: 'badge-conservador',
       subtitulo: 'Prioridade total à segurança e blindagem financeira',
-      poupancaPctMargem: 0.15, // 15% da margem livre
-      variavelPctMargem: 0.85, // 85% da margem livre
+      poupancaPctMargem: 0.15,
+      variavelPctMargem: 0.85,
       alocacao: [
         { ativo: 'Tesouro Selic / Reserva de Emergência', pct: 75, cor: '#22c55e' },
         { ativo: 'CDB 100%+ CDI (Liquidez Diária)', pct: 25, cor: '#16a34a' }
@@ -403,8 +379,8 @@ document.addEventListener('DOMContentLoaded', () => {
       nome: 'Moderado',
       classeBadge: 'badge-moderado',
       subtitulo: 'Equilíbrio entre reserva e rentabilidade',
-      poupancaPctMargem: 0.25, // 25% da margem livre
-      variavelPctMargem: 0.75, // 75% da margem livre
+      poupancaPctMargem: 0.25,
+      variavelPctMargem: 0.75,
       alocacao: [
         { ativo: 'Renda Fixa / Reserva (CDI / Selic)', pct: 50, cor: '#3b82f6' },
         { ativo: 'Fundos Imobiliários (FIIs) & IPCA+', pct: 35, cor: '#8b5cf6' },
@@ -416,8 +392,8 @@ document.addEventListener('DOMContentLoaded', () => {
       nome: 'Arrojado',
       classeBadge: 'badge-arrojado',
       subtitulo: 'Foco em valorização e potencial de longo prazo',
-      poupancaPctMargem: 0.35, // 35% da margem livre
-      variavelPctMargem: 0.65, // 65% da margem livre
+      poupancaPctMargem: 0.35,
+      variavelPctMargem: 0.65,
       alocacao: [
         { ativo: 'Ações & Dividendos (Brasil)', pct: 45, cor: '#f59e0b' },
         { ativo: 'ETFs Globais & FIIs', pct: 30, cor: '#ef4444' },
@@ -428,14 +404,14 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   function renderizarCabecalho(usuario) {
-    $('perfil-nome').textContent = usuario.nome;
-    $('perfil-email').textContent = usuario.email;
-    preencherAvatar($('perfil-avatar'), usuario, true);
-    capaImg.style.backgroundImage = usuario.capa ? `url("${usuario.capa}")` : '';
-    $('btn-remover-foto').hidden = !usuario.foto;
-    $('btn-remover-capa').hidden = !usuario.capa;
+    if (!usuario) return;
+    if ($('perfil-nome')) $('perfil-nome').textContent = usuario.nome || 'Usuário';
+    if ($('perfil-email')) $('perfil-email').textContent = usuario.email || '';
+    if ($('perfil-avatar')) preencherAvatar($('perfil-avatar'), usuario, true);
+    if (capaImg) capaImg.style.backgroundImage = usuario.capa ? `url("${usuario.capa}")` : '';
+    if ($('btn-remover-foto')) $('btn-remover-foto').hidden = !usuario.foto;
+    if ($('btn-remover-capa')) $('btn-remover-capa').hidden = !usuario.capa;
 
-    // Atualiza a badge do perfil
     const badgeEl = $('perfil-badge');
     if (badgeEl) {
       const cfg = PERFIS_CONFIG[usuario.perfil] || PERFIS_CONFIG.moderado;
@@ -446,18 +422,18 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function preencherFormDados(usuario) {
-    $('p-nome').value = usuario.nome;
-    $('p-email').value = usuario.email;
-    $('p-telefone').value = formatarTelefone(usuario.telefone || '');
-    $('p-perfil').value = usuario.perfil;
+    if (!usuario) return;
+    if ($('p-nome')) $('p-nome').value = usuario.nome || '';
+    if ($('p-email')) $('p-email').value = usuario.email || '';
+    if ($('p-telefone')) $('p-telefone').value = formatarTelefone(usuario.telefone || '');
+    if ($('p-perfil')) $('p-perfil').value = usuario.perfil || 'moderado';
   }
 
   function preencherFormFinancas(usuario) {
-    $('p-renda').value = usuario.renda == null ? '' : usuario.renda;
-    $('p-gastos').value = usuario.gastosFixos == null ? '' : usuario.gastosFixos;
+    if (!usuario) return;
+    if ($('p-renda')) $('p-renda').value = usuario.renda == null ? '' : usuario.renda;
+    if ($('p-gastos')) $('p-gastos').value = usuario.gastosFixos == null ? '' : usuario.gastosFixos;
   }
-
-  // Campo vazio => null | valor inválido => NaN | senão, o número
   function lerNumero(texto) {
     const t = String(texto).trim();
     if (t === '') return null;
@@ -465,51 +441,57 @@ document.addEventListener('DOMContentLoaded', () => {
     return Number.isFinite(n) && n >= 0 ? n : NaN;
   }
 
-  formDados.addEventListener('submit', (e) => {
+  formDados.addEventListener('submit', async (e) => {
     e.preventDefault();
+    const { data: { user } } = await _supabase.auth.getUser();
+    if (!user) return;
 
     const nome = $('p-nome').value.trim();
     if (!nome) { mostrarToast('Informe seu nome para salvar.', 'erro'); return; }
 
-    const ok = atualizarUsuario({
-      nome,
+    const ok = await atualizarPerfilSupabase({
+      nome: nome,
       telefone: $('p-telefone').value.trim(),
       perfil: $('p-perfil').value
     });
-    if (!ok) { mostrarToast('Não foi possível salvar. Verifique o armazenamento do navegador.', 'erro'); return; }
 
-    const usuario = usuarioLogado();
+    if (!ok) { mostrarToast('Erro ao salvar no banco.', 'erro'); return; }
+
+    const usuario = await getUsuarioAtual();
     renderizarCabecalho(usuario);
-    renderizarDiagnostico(usuario); // a diretriz e os percentuais mudam conforme o perfil de investidor
-    atualizarInterface();
+    renderizarDiagnostico(usuario);
+    await atualizarInterface();
     mostrarToast('Dados pessoais e perfil atualizados!');
-    reposicionarTutorial();
   });
 
-  formFinancas.addEventListener('submit', (e) => {
+  formFinancas.addEventListener('submit', async (e) => {
     e.preventDefault();
+    const { data: { user } } = await _supabase.auth.getUser();
+    if (!user) return;
 
     const renda = lerNumero($('p-renda').value);
     const gastosFixos = lerNumero($('p-gastos').value);
+
     if (Number.isNaN(renda) || Number.isNaN(gastosFixos)) {
-      mostrarToast('Use apenas valores numéricos iguais ou maiores que zero.', 'erro');
+      mostrarToast('Use apenas valores numéricos válidos.', 'erro');
       return;
     }
 
-    if (!atualizarUsuario({ renda, gastosFixos })) {
-      mostrarToast('Não foi possível salvar. Verifique o armazenamento do navegador.', 'erro');
-      return;
-    }
+    const ok = await atualizarPerfilSupabase({
+      renda: renda,
+      gastos_fixos: gastosFixos
+    });
 
-    renderizarDiagnostico(usuarioLogado());
+    if (!ok) { mostrarToast('Erro ao salvar finanças no banco.', 'erro'); return; }
+
+    const usuario = await getUsuarioAtual();
+    renderizarDiagnostico(usuario);
     mostrarToast('Ganhos e gastos salvos! Diagnóstico atualizado.');
-    reposicionarTutorial();
   });
 
   // ---------------------------------------------------------
   // 9. CÁLCULO E RENDERIZAÇÃO DO DIAGNÓSTICO INTELIGENTE
   // ---------------------------------------------------------
-
   function calcularDiagnostico(usuario) {
     const { renda, gastosFixos, perfil = 'moderado' } = usuario;
     if (renda == null || gastosFixos == null || renda <= 0) return null;
@@ -573,7 +555,6 @@ document.addEventListener('DOMContentLoaded', () => {
       ? `<p class="diag-alerta">Atenção: seus gastos fixos (${formatBRL(d.gastosFixos)}) superam sua renda (${formatBRL(d.renda)}). É crucial renegociar despesas essenciais antes de definir novos gastos variáveis ou poupança.</p>`
       : '';
 
-    // Monta a barra de alocação de ativos sugerida
     const alocBarrasHtml = d.config.alocacao.map((item) => `
       <div class="aloc-fatia" style="width: ${item.pct}%; background: ${item.cor};" title="${item.ativo}: ${item.pct}%"></div>
     `).join('');
@@ -648,7 +629,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
       ${alerta}
 
-      <!-- Sugestão Inteligente de Alocação por Ativos -->
       <div class="diag-alocacao">
         <div class="diag-alocacao-topo">
           <h4>Alocação Recomendada (IA)</h4>
@@ -667,7 +647,6 @@ document.addEventListener('DOMContentLoaded', () => {
       </p>
     `;
 
-    // Anima as barras de distribuição proporcional da renda
     requestAnimationFrame(() => requestAnimationFrame(() => {
       box.querySelectorAll('.diag-seg').forEach((seg) => {
         seg.style.width = `${seg.dataset.w}%`;
@@ -678,8 +657,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // ---------------------------------------------------------
   // 10. FOTO DE PERFIL E IMAGEM DE CAPA
   // ---------------------------------------------------------
-  // Redimensiona/recorta a imagem no navegador antes de salvar,
-  // para não estourar o limite do armazenamento local.
   function prepararImagem(arquivo, largura, altura, qualidade) {
     return new Promise((resolve, reject) => {
       if (!arquivo.type.startsWith('image/')) { reject(new Error('tipo')); return; }
@@ -694,7 +671,6 @@ document.addEventListener('DOMContentLoaded', () => {
         canvas.height = altura;
         const ctx = canvas.getContext('2d');
 
-        // "cover": preenche todo o quadro cortando o excesso, centralizado
         const escala = Math.max(largura / img.width, altura / img.height);
         const cw = largura / escala;
         const ch = altura / escala;
@@ -712,16 +688,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function trocarImagem(input, campo, largura, altura, qualidade, msgOk) {
     const arquivo = input.files && input.files[0];
-    input.value = ''; // permite escolher o mesmo arquivo de novo depois
+    input.value = '';
     if (!arquivo) return;
 
     try {
       const dataUrl = await prepararImagem(arquivo, largura, altura, qualidade);
-      if (!atualizarUsuario({ [campo]: dataUrl })) throw new Error('armazenamento');
+      const ok = await atualizarPerfilSupabase({ [campo]: dataUrl });
+      if (!ok) throw new Error('armazenamento');
 
-      const usuario = usuarioLogado();
+      const usuario = await getUsuarioAtual();
       renderizarCabecalho(usuario);
-      atualizarInterface();
+      await atualizarInterface();
       mostrarToast(msgOk);
       reposicionarTutorial();
     } catch (err) {
@@ -729,28 +706,27 @@ document.addEventListener('DOMContentLoaded', () => {
         tipo: 'Escolha um arquivo de imagem (JPG, PNG ou WebP).',
         tamanho: 'A imagem é muito grande. Escolha uma de até 12 MB.',
         leitura: 'Não foi possível ler essa imagem. Tente outro arquivo.',
-        armazenamento: 'Não foi possível salvar a imagem: o armazenamento do navegador está cheio.'
+        armazenamento: 'Não foi possível salvar a imagem no banco.'
       };
       mostrarToast(msgs[err.message] || msgs.leitura, 'erro');
     }
   }
 
-  function removerImagem(campo, msg) {
-    atualizarUsuario({ [campo]: null });
-    renderizarCabecalho(usuarioLogado());
-    atualizarInterface();
+  async function removerImagem(campo, msg) {
+    await atualizarPerfilSupabase({ [campo]: null });
+    const usuario = await getUsuarioAtual();
+    renderizarCabecalho(usuario);
+    await atualizarInterface();
     mostrarToast(msg);
   }
 
   $('btn-alterar-foto').addEventListener('click', () => $('input-foto').click());
   $('btn-alterar-capa').addEventListener('click', () => $('input-capa').click());
-  $('input-foto').addEventListener('change', (e) => trocarImagem(e.target, 'foto', 320, 320, 0.86, 'Foto de perfil atualizada!'));
-  $('input-capa').addEventListener('change', (e) => trocarImagem(e.target, 'capa', 1400, 440, 0.8, 'Imagem de capa atualizada!'));
-  $('btn-remover-foto').addEventListener('click', () => removerImagem('foto', 'Foto removida.'));
-  $('btn-remover-capa').addEventListener('click', () => removerImagem('capa', 'Capa removida.'));
+  $('input-foto').addEventListener('change', (e) => trocarImagem(e.target, 'foto', 320, 320, 0.86, 'Foto de perfil atualizada!')); $('input-capa').addEventListener('change', (e) => trocarImagem(e.target, 'capa', 1400, 440, 0.8, 'Imagem de capa atualizada!'));
+  $('btn-remover-foto').addEventListener('click', () => removerImagem('foto', 'Foto removida.')); $('btn-remover-capa').addEventListener('click', () => removerImagem('capa', 'Capa removida.'));
 
   // ---------------------------------------------------------
-  // 11. TUTORIAL GUIADO (pop-ups apontando onde preencher cada informação)
+  // 11. TUTORIAL GUIADO
   // ---------------------------------------------------------
   const overlay = $('tour-overlay');
   const ring = $('tour-ring');
@@ -811,8 +787,8 @@ document.addEventListener('DOMContentLoaded', () => {
     ];
   }
 
-  function iniciarTutorial() {
-    const usuario = usuarioLogado();
+  async function iniciarTutorial() {
+    const usuario = await getUsuarioAtual();
     if (!usuario || tourAtivo || viewPerfil.hidden) return;
 
     tourPassos = montarPassos(usuario);
@@ -823,7 +799,7 @@ document.addEventListener('DOMContentLoaded', () => {
     irParaPasso(0);
   }
 
-  function encerrarTutorial(marcarComoVisto) {
+  async function encerrarTutorial(marcarComoVisto) {
     if (!tourAtivo) return;
     tourAtivo = false;
     overlay.hidden = true;
@@ -831,15 +807,14 @@ document.addEventListener('DOMContentLoaded', () => {
     ring.hidden = true;
     pop.hidden = true;
     pop.classList.add('oculto');
-    if (marcarComoVisto) atualizarUsuario({ tutorialVisto: true });
+    if (marcarComoVisto) await atualizarPerfilSupabase({ tutorial_visto: true });
   }
 
-  function finalizarTutorial() {
-    encerrarTutorial(true);
+  async function finalizarTutorial() {
+    await encerrarTutorial(true);
     mostrarToast('Tutorial concluído! Você pode revê-lo quando quiser em "Ver tutorial".');
   }
 
-  // Espera a rolagem suave terminar antes de mostrar o pop-up
   function aguardarRolagem(callback) {
     let ultimo = window.scrollY;
     let parado = 0;
@@ -855,13 +830,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 50);
   }
 
-  // Rola a página só se o elemento não estiver totalmente visível
   function trazerParaVista(alvo, callback) {
     const r = alvo.getBoundingClientRect();
     const altura = window.innerHeight;
     const movel = window.innerWidth < 700;
-    const topoMin = 92;                                   // abaixo da barra superior
-    const baseMax = movel ? altura - 250 : altura - 24;   // no celular, o pop-up fica embaixo
+    const topoMin = 92;
+    const baseMax = movel ? altura - 250 : altura - 24;
 
     if (r.top >= topoMin && r.bottom <= baseMax) { callback(); return; }
 
@@ -941,7 +915,6 @@ document.addEventListener('DOMContentLoaded', () => {
     pop.append(topo, titulo, criar('p', null, passo.texto), rodape);
   }
 
-  // Monta o caminho do fundo escuro: retângulo da tela inteira com um "buraco" arredondado
   function caminhoComBuraco(W, H, x, y, w, h, raio) {
     const r = Math.max(0, Math.min(raio, w / 2, h / 2));
     return [
@@ -985,11 +958,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function posicionarPopover(rect, W, H) {
     const margem = 16;
-    const topoMin = 84; // não cobre a barra superior
+    const topoMin = 84;
     const movel = W < 700;
     pop.classList.toggle('modo-movel', movel);
 
-    // Celular: o pop-up vira uma "folha" fixa na parte de baixo da tela
     if (movel) {
       Object.assign(pop.style, { left: '1rem', right: '1rem', top: 'auto', bottom: '1rem' });
       return;
@@ -1004,7 +976,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!rect) {
       pos = { x: (W - pw) / 2, y: (H - ph) / 2 };
     } else {
-      // Tenta abaixo, acima, à direita e à esquerda do elemento destacado
       const candidatos = [
         { x: limitarX(rect.x + rect.w / 2 - pw / 2), y: rect.y + rect.h + margem },
         { x: limitarX(rect.x + rect.w / 2 - pw / 2), y: rect.y - ph - margem },
@@ -1013,13 +984,12 @@ document.addEventListener('DOMContentLoaded', () => {
       ];
       pos = candidatos.find((c) =>
         c.x >= margem && c.x + pw <= W - margem && c.y >= topoMin && c.y + ph <= H - margem
-      ) || { x: (W - pw) / 2, y: H - ph - margem }; // sem espaço: fica embaixo, centralizado
+      ) || { x: (W - pw) / 2, y: H - ph - margem };
     }
 
     Object.assign(pop.style, { left: `${pos.x}px`, top: `${pos.y}px`, right: 'auto', bottom: 'auto' });
   }
 
-  // Reposiciona (uma vez por quadro) quando a página rola, muda de tamanho ou o conteúdo se altera
   function reposicionarTutorial() {
     if (!tourAtivo || tourFrame) return;
     tourFrame = requestAnimationFrame(() => { tourFrame = null; posicionar(); });
@@ -1028,7 +998,6 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('scroll', reposicionarTutorial, { passive: true });
   window.addEventListener('resize', reposicionarTutorial);
 
-  // Atalhos do teclado durante o tutorial
   document.addEventListener('keydown', (e) => {
     if (!tourAtivo) return;
     const emCampo = /^(INPUT|SELECT|TEXTAREA)$/.test((e.target.tagName || ''));
@@ -1046,30 +1015,50 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-tutorial').addEventListener('click', iniciarTutorial);
 
   // ---------------------------------------------------------
-  // 12. INICIALIZAÇÃO E ROTAS
+  // 12. INICIALIZAÇÃO E ROTAS (PERMITE NAVEGAR ENTRE HOME E PERFIL)
   // ---------------------------------------------------------
-  function verificarRotaInicial() {
-    const params = new URLSearchParams(window.location.search);
+  async function verificarRotaInicial() {
     const hash = window.location.hash;
 
-    // Se vier do Chatbot clicando em "Editar Perfil" (#perfil ou ?view=perfil)
-    if (hash === '#perfil' || params.get('view') === 'perfil') {
-      if (usuarioLogado()) {
-        abrirPerfil();
+    if (hash === '#perfil') {
+      // Exibe imediatamente o perfil visualmente para evitar o atraso de carregamento
+      mostrarView('perfil');
+      
+      const usuario = await getUsuarioAtual();
+      if (usuario) {
+        renderizarCabecalho(usuario);
+        preencherFormDados(usuario);
+        preencherFormFinancas(usuario);
+        renderizarDiagnostico(usuario);
       } else {
+        // Caso não esteja autenticado, redireciona para a home e abre o login
+        mostrarView('home');
         abrirModal('login');
       }
+    } else {
+      mostrarView('home');
     }
   }
+  window.addEventListener('hashchange', async () => {
+    const hash = window.location.hash;
+    const usuario = await getUsuarioAtual();
 
-  window.addEventListener('hashchange', () => {
-    if (window.location.hash === '#perfil') {
-      if (usuarioLogado()) abrirPerfil();
-    } else if (!window.location.hash || window.location.hash === '#home') {
+    if (hash === '#perfil') {
+      if (usuario) {
+        await abrirPerfil();
+      } else {
+        mostrarView('home');
+        abrirModal('login');
+      }
+    } else {
       mostrarView('home');
     }
   });
 
-  atualizarInterface();
-  verificarRotaInicial();
+  // Inicializa a interface
+  (async () => {
+    await atualizarInterface();
+    await verificarRotaInicial();
+  })();
+
 });

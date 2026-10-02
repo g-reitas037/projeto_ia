@@ -9,9 +9,21 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-client.js"></script>
 </head>
 <body data-view="home">
-
+<script>
+  // Execução síncrona imediata para evitar "flicker" da Home ao entrar pelo #perfil
+  if (window.location.hash === '#perfil') {
+    document.addEventListener('DOMContentLoaded', () => {
+      const vHome = document.getElementById('view-home');
+      const vPerfil = document.getElementById('view-perfil');
+      if (vHome) vHome.hidden = true;
+      if (vPerfil) vPerfil.hidden = false;
+    });
+  }
+</script>
   <!-- Barra Superior Fixa -->
   <header class="top-bar">
     <div class="logo">

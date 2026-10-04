@@ -2,20 +2,23 @@
 
 ## Visao geral
 
-O Organiza+ e uma aplicacao web de planejamento financeiro pessoal. A pessoa usuaria pode criar uma conta, manter dados financeiros e preferencias de perfil, consultar um diagnostico e conversar com um assistente que sugere respostas com base nesses dados.
+O Organiza+ e uma aplicacao web de planejamento financeiro pessoal. A pessoa usuaria pode criar uma conta, manter dados financeiros e preferencias de perfil, consultar um diagnostico e conversar com um assistente.
 
-A interface usa HTML, CSS e JavaScript no navegador. A autenticacao e os dados de perfil e conversa sao persistidos no Supabase. O chatbot atual e baseado em regras locais; nao usa RASA nem um modelo de IA conectado.
+A interface usa HTML, CSS e JavaScript. A autenticacao, os perfis e o historico do chat usam Supabase. O assistente envia mensagens ao Rasa para classificacao de intencoes e execucao de acoes; se o servidor Rasa estiver indisponivel, o chat usa respostas locais por palavras-chave. O projeto nao usa um modelo de linguagem generativo.
 
 ## Funcionalidades implementadas
 
 - Cadastro, login e logout com Supabase Auth.
 - Perfil com nome, telefone, perfil de investidor, renda, gastos fixos, foto e imagem de capa.
 - Diagnostico financeiro calculado a partir da renda e dos gastos fixos.
-- Chat com respostas por palavras-chave para temas como teto de gastos, investimentos, reserva de emergencia e economia.
+- Diagnostico financeiro calculado de acordo com renda, gastos fixos e perfil de investidor.
+- Chat integrado ao Rasa para saudacao, teto de gastos, investimentos, reserva, economia, simulacoes, comparativos, conceitos e avaliacao de compras.
+- Graficos interativos de orcamento, alocacao de investimentos e projecao de poupanca, com opcao de baixar a imagem.
 - Historico de mensagens persistido por usuario no Supabase, com opcao para limpar a conversa.
 - Tema claro/escuro, salvo localmente no navegador.
+- Tutorial guiado do perfil, exibido no primeiro acesso e disponivel para revisao.
 
-Graficos, comparacoes historicas, controle detalhado de entradas e saidas e processamento por RASA permanecem como propostas, nao como recursos implementados.
+O sistema nao mantem um livro de transacoes nem compara historico financeiro entre periodos. As simulacoes sao estimativas e nao representam uma garantia de rendimento.
 
 ## Requisitos e execucao
 
@@ -24,13 +27,31 @@ Graficos, comparacoes historicas, controle detalhado de entradas e saidas e proc
 - A aplicacao carrega Supabase JS v2 por CDN.
 - Git, caso deseje contribuir com o codigo.
 
-Na raiz do projeto, inicie um servidor HTTP local. Com Python instalado:
+Na raiz do repositorio, sirva a pasta da aplicacao. Com Python instalado:
 
 ```bash
-python3 -m http.server 8000
+python3 -m http.server 8000 --directory "Organiza Mais"
 ```
 
-Abra `http://localhost:8000`; a pagina inicial e `index.html`. Tambem e possivel usar a extensao Live Server ou outro servidor estatico.
+Abra `http://localhost:8000`; a pagina inicial e `index.html`. Tambem e possivel abrir a pasta `Organiza Mais` no VS Code e usar Live Server.
+
+Para habilitar o assistente Rasa, use dois terminais. O ambiente Python local deste workspace fica em `~/.venvs/organiza-rasa` e usa Python 3.10, Rasa 3.6.21 e Rasa SDK 3.6.2. No primeiro terminal:
+
+```bash
+cd "Organiza Mais/organiza-rasa"
+source ~/.venvs/organiza-rasa/bin/activate
+rasa run --enable-api --cors "*" --port 5005
+```
+
+No segundo terminal, execute a partir do mesmo diretorio e ambiente:
+
+```bash
+cd "Organiza Mais/organiza-rasa"
+source ~/.venvs/organiza-rasa/bin/activate
+rasa run actions --port 5055
+```
+
+Os modelos treinados estao em `organiza-rasa/models/`. Execute `rasa train` nesse diretorio somente quando alterar os dados NLU, as regras, as historias, o dominio ou a configuracao do modelo. O frontend ainda responde com o motor local quando o Rasa nao esta disponivel.
 
 O projeto nao possui servidor proprio nem etapa de build. Como a aplicacao depende do Supabase, abrir os arquivos diretamente com `file://` nao substitui a configuracao e o acesso a rede necessarios.
 
@@ -46,29 +67,91 @@ O projeto nao possui servidor proprio nem etapa de build. Como a aplicacao depen
 | `style.css` | Estilos globais, home, cadastro e perfil. |
 | `chat.css` | Estilos especificos da interface do chatbot. |
 | `img/` | Imagens utilizadas pela interface. |
-| `PDF/` | Materiais complementares do projeto. |
-| `documentacao.md` | Arquitetura, configuracao e manual tecnico. |
+| `PDF/` | Guias e materiais complementares do projeto. |
+| `organiza-rasa/` | Configuracao, dados de treinamento, modelos e acoes personalizadas do Rasa. |
+| `README.md` | Inicializacao rapida e visao geral. |
+| `documentacao.md` | Arquitetura, configuracao, manual de uso e fluxos. |
 
-## Fluxo implementado
+## Manual do usuario
 
-1. `index.html` e `chat.html` carregam Supabase JS v2, `supabase-client.js` e, em seguida, o script da pagina.
-2. O cadastro e o login usam Supabase Auth. Os metadados de cadastro enviados sao nome, telefone e perfil de investidor.
-3. A aplicacao consulta o registro da pessoa usuaria na tabela `perfis`. A criacao desse registro deve estar configurada no projeto Supabase, por exemplo, por um trigger associado ao cadastro; este repositorio nao inclui o SQL de configuracao do banco.
-4. Edicoes de perfil, valores financeiros e imagens atualizam o registro em `perfis`.
-5. O chatbot exige uma sessao autenticada, consulta o perfil e carrega as mensagens de `historico_chat` em ordem cronologica.
-6. As mensagens do usuario e as respostas geradas localmente sao gravadas no historico. A acao de limpar conversa exclui as mensagens daquele usuario.
+### Criar conta e entrar
+
+1. Na pagina inicial, escolha **Criar cadastro** e informe nome, e-mail, telefone, perfil de investidor e senha. A senha deve ter pelo menos seis caracteres.
+2. Se o projeto Supabase exigir confirmacao de e-mail, confirme o endereco e depois entre pela aba **Entrar**.
+3. O acesso ao perfil e ao chatbot exige uma sessao autenticada. Use **Sair** para encerrar a sessao sem apagar seus dados.
+
+### Completar o perfil e ler o diagnostico
+
+1. Informe nome, telefone e perfil de investidor no formulario de dados pessoais. O e-mail usado no login nao e editavel nessa tela.
+2. Informe a renda liquida mensal e o total de gastos fixos. Valores vazios sao aceitos, mas o diagnostico so e calculado quando renda e gastos estao preenchidos e a renda e maior que zero.
+3. Salve os dados financeiros para atualizar a margem livre, o teto sugerido para gastos variaveis, a meta de poupanca e a alocacao indicativa.
+4. Se os gastos fixos superarem a renda, o diagnostico mostra um alerta. O sistema nao registra cada compra ou conta individual.
+5. Foto de perfil e capa sao opcionais. Sao aceitos arquivos de imagem de ate 12 MB; a imagem e redimensionada no navegador antes de ser gravada no perfil. Os botoes **Remover foto** e **Remover capa** apagam a imagem correspondente.
+6. O tutorial aparece no primeiro acesso ao perfil. Use **Ver tutorial** para abri-lo novamente; e possivel avancar, voltar, pular ou concluir.
+
+### Usar o chatbot
+
+1. Abra **Chatbot Inteligente** depois de entrar na conta. O chat carrega o perfil e as mensagens anteriores.
+2. Escolha uma pergunta rapida ou escreva sobre teto de gastos, investimentos, reserva de emergencia, economia, simulacao, comparativo, conceitos ou uma compra.
+3. Pressione **Enter** para enviar. Use **Shift + Enter** para inserir uma quebra de linha.
+4. Quando o Rasa esta disponivel, as perguntas passam pelas intencoes e acoes configuradas. Algumas respostas incluem graficos; clique nos segmentos interativos quando houver indicacao e use o botao de download para salvar a imagem.
+5. Se a chamada ao Rasa falhar, o chat tenta responder pelo motor local. Esse modo cobre perguntas por palavras-chave, mas nao produz os graficos do Rasa.
+6. O historico e salvo por usuario no Supabase. Use **Limpar historico da conversa** e confirme para apagar as mensagens armazenadas. A preferencia de tema pode ser alternada no controle claro/escuro.
+
+## Fluxos do usuario
+
+### Cadastro, perfil e diagnostico
 
 ```mermaid
 flowchart TD
-    A[ navegador ] --> B[index.html ou chat.html]
-    B --> C[Supabase JS v2 e supabase-client.js]
+    A[Pagina inicial] --> B{Ja tem conta?}
+    B -->|Nao| C[Criar cadastro]
     C --> D[Supabase Auth]
-    D --> E[(Tabela perfis)]
-    D --> F[chat.js: regras por palavras-chave]
-    F --> G[(Tabela historico_chat)]
-    E --> H[Diagnostico e respostas personalizadas]
-    G --> I[Historico da conversa]
+    D --> E{Sessao disponivel?}
+    B -->|Sim| F[Entrar]
+    F --> D
+    E -->|Sim| G[Carregar perfil]
+    E -->|Nao| H[Confirmar e-mail ou entrar]
+    H --> F
+    G --> I[Editar dados e perfil de investidor]
+    I --> J[Informar renda e gastos fixos]
+    J --> K[Salvar no Supabase]
+    K --> L{Renda e gastos validos?}
+    L -->|Nao| M[Mostrar orientacao para completar o perfil]
+    L -->|Sim| N[Calcular diagnostico e alocacao indicativa]
+    N --> O[Abrir chatbot ou continuar no perfil]
 ```
+
+### Conversa e historico
+
+```mermaid
+flowchart TD
+    A[Usuario autenticado abre o chat] --> B[Carregar perfil e historico do Supabase]
+    B --> C[Digitar pergunta ou escolher pergunta rapida]
+    C --> D[Salvar mensagem do usuario]
+    D --> E{Webhook Rasa responde?}
+    E -->|Sim| F[Classificar intencao e executar resposta ou acao]
+    F --> G{Resposta contem grafico?}
+    G -->|Sim| H[Renderizar texto e grafico interativo]
+    G -->|Nao| I[Renderizar texto]
+    E -->|Nao| J[Gerar resposta local por palavras-chave]
+    H --> K[Salvar resposta no historico]
+    I --> K
+    J --> K
+    K --> L[Usuario pode continuar ou limpar o historico]
+```
+
+O modelo classifica mensagens no Rasa em `localhost:5005`; as acoes personalizadas usam `localhost:5055`. As acoes financeiras recebem perfil, renda e gastos enviados pelo frontend. As acoes de saudacao e avaliacao de compra consultam o perfil no Supabase pelo ID do usuario e dependem das politicas de acesso dessa tabela.
+
+## Fluxo tecnico
+
+1. `index.html` e `chat.html` carregam Supabase JS v2, `supabase-client.js` e o script da pagina.
+2. Cadastro e login usam Supabase Auth. O cadastro envia nome, telefone e perfil de investidor como metadados.
+3. O perfil precisa existir na tabela `perfis`; a criacao automatica desse registro, por exemplo via trigger de cadastro, deve estar configurada no Supabase. O SQL nao esta incluido neste repositorio.
+4. Edicoes de perfil, valores financeiros, foto e capa atualizam o registro em `perfis`.
+5. O chatbot exige sessao autenticada, consulta o perfil e carrega `historico_chat` em ordem cronologica.
+6. Mensagens sao enviadas ao webhook REST do Rasa com o ID e os dados financeiros do perfil. Respostas com payload de grafico sao renderizadas pelo Chart.js; falhas na chamada acionam o motor local.
+7. Mensagens e respostas sao gravadas em `historico_chat`. A acao de limpar conversa exclui as mensagens do usuario autenticado.
 
 ## Supabase e modelo de dados
 
@@ -93,7 +176,7 @@ O unico dado da aplicacao gravado diretamente em `localStorage` e a preferencia 
 | --- | --- |
 | `aurafinance_theme` | Tema selecionado: `light` ou `dark`. |
 
-Contas, sessoes, perfis e historico de chat nao usam as antigas chaves locais `organizamais_usuarios`, `organizamais_sessao` ou `organizamais_chat_<email>`; esses dados agora dependem do Supabase. Para redefinir apenas o tema durante o desenvolvimento, execute no console:
+Contas, sessoes, perfis e historico de chat dependem do Supabase. Para redefinir apenas o tema durante o desenvolvimento, execute no console:
 
 ```javascript
 localStorage.removeItem('aurafinance_theme');
@@ -103,27 +186,13 @@ Sair da conta encerra a sessao, mas nao apaga o perfil nem o historico remoto.
 
 ## Chat e regras financeiras
 
-O motor de respostas fica em `gerarRespostaFinanceira`, em `chat.js`. Ele procura palavras-chave na mensagem e calcula sugestoes usando o perfil, a renda e os gastos fixos armazenados. As respostas nao sao geradas por um modelo de linguagem.
+`chat.js` envia as mensagens ao endpoint REST do Rasa em `localhost:5005` e encaminha o perfil financeiro junto com a requisicao. O servidor Rasa usa NLU, regras e acoes personalizadas definidas em `organiza-rasa/`; o servidor de acoes escuta em `localhost:5055`.
 
-As configuracoes de perfis de investidor tambem ficam em `chat.js`, no objeto `PERFIS_CONFIG`. Ao alterar os percentuais, valide a regra financeira e teste respostas de teto de gastos, investimentos e reserva de emergencia. Preserve o escape do texto digitado antes de exibi-lo como HTML.
+As acoes de teto, alocacao, reserva, simulacao e comparativo usam os dados do perfil enviados pelo frontend. As acoes de saudacao e avaliacao de compra consultam o perfil no Supabase pelo ID do usuario. Garanta que as politicas de acesso do Supabase permitam as consultas necessarias sem expor uma chave privilegiada.
 
-O fluxo com RASA mostrado abaixo e uma referencia conceitual para evolucao do produto; nao representa o caminho executado pelo codigo atual.
+As acoes podem retornar graficos Chart.js de distribuicao de gastos, alocacao sugerida e projecao de poupanca. A funcao `gerarRespostaFinanceira`, em `chat.js`, e o fallback local: ela procura palavras-chave e nao usa um modelo generativo. Esse fallback nao renderiza os graficos do Rasa.
 
-```mermaid
-flowchart TD
-    A([Usuario]) --> B[Interpretacao da solicitacao]
-    B --> C[Coleta de dados financeiros]
-    C --> D[Analise financeira]
-    D --> E{Tipo de solicitacao}
-    E -->|Visualizacao| F[Gerar graficos]
-    E -->|Comparacao| G[Comparar periodos ou cenarios]
-    E -->|Planejamento| H[Montar plano de gastos]
-    E -->|Controle| I[Controlar entradas e saidas]
-    F --> J[Apresentar resultado]
-    G --> J
-    H --> J
-    I --> J
-```
+As configuracoes locais de perfis de investidor ficam em `PERFIS_CONFIG`, em `chat.js`; as regras e respostas processadas pelo Rasa ficam em `organiza-rasa/data/` e `organiza-rasa/actions/actions.py`. Preserve o escape do texto digitado antes de exibi-lo como HTML.
 
 ## Checklist de testes manuais
 
@@ -134,6 +203,8 @@ flowchart TD
 - Atualizar e remover foto e imagem de capa.
 - Confirmar a atualizacao do diagnostico apos editar renda ou gastos.
 - Enviar uma pergunta pelo botao, por `Enter` e por uma pergunta rapida; testar `Shift + Enter` para quebra de linha.
+- Com os servidores ativos, testar saudacao, teto, alocacao, reserva, economia, simulacao, comparativo, conceitos e avaliacao de compra.
+- Conferir graficos interativos e download; depois desligar o Rasa e verificar o fallback local.
 - Confirmar que mensagens e respostas aparecem apos recarregar o chat.
 - Testar respostas de teto de gastos, investimentos, reserva e economia, com e sem dados financeiros preenchidos.
 - Limpar o historico e confirmar que ele continua vazio depois de recarregar.
@@ -143,7 +214,8 @@ flowchart TD
 
 - A aplicacao depende de internet e de um projeto Supabase acessivel; falhas de rede ou configuracao afetam login e persistencia.
 - O codigo do banco e as politicas RLS nao estao incluidos neste repositorio e precisam ser configurados separadamente.
-- O chat usa regras e palavras-chave, nao RASA nem um modelo de IA conectado.
-- Graficos, comparacoes historicas e controle detalhado de transacoes ainda nao estao implementados.
+- As respostas do Rasa e os graficos dependem dos dois servidores locais ativos; o fallback cobre somente as regras por palavras-chave implementadas em JavaScript.
+- O sistema nao usa um modelo de linguagem generativo, nao registra transacoes e nao oferece comparacoes entre periodos historicos.
+- Algumas acoes Rasa consultam o perfil diretamente no Supabase; erros de acesso a essa tabela podem impedir essas respostas.
 - O sistema e um prototipo de apoio e nao substitui orientacao financeira profissional.
 - A chave `anon` e publica por natureza; a protecao dos dados depende de politicas RLS corretas. Nao publique chaves privilegiadas.

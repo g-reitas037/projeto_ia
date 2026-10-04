@@ -25,20 +25,21 @@ python3 -m http.server 8000
 
 Depois, abra `http://localhost:8000` no navegador. A entrada da aplicacao e `index.html`.
 
-Tambem e possivel usar a extensao Live Server do VS Code ou outro servidor estatico equivalente. Abra `http://localhost:8000`.
+Tambem e possivel usar a extensao Live Server do VS Code ou outro servidor estatico equivalente.
 
 ## Executar o Rasa
 
-O servidor Rasa habilita respostas do assistente e graficos. O projeto usa Rasa 3.6.21, Python 3.10 e o SDK 3.6.2. Se o servidor nao estiver disponivel, o chat usa o motor local de respostas.
+O servidor Rasa habilita classificacao de intencoes, acoes personalizadas e graficos. O projeto usa Rasa 3.6.21, Python 3.10 e o SDK 3.6.2. Se o servidor nao estiver disponivel, o chat tenta usar o motor local de respostas; esse modo nao gera os graficos do Rasa.
 
 Em um terminal, entre em `organiza-rasa`, ative o ambiente Python onde Rasa foi instalado e inicie o servidor:
 
 ```bash
 cd organiza-rasa
 source ~/.venvs/organiza-rasa/bin/activate
-rasa train
 rasa run --enable-api --cors "*" --port 5005
 ```
+
+Os modelos treinados ja estao em `organiza-rasa/models/`. Execute `rasa train` nesse diretorio somente depois de alterar os dados ou a configuracao do assistente.
 
 Em outro terminal, no mesmo diretorio e ambiente, inicie as acoes personalizadas:
 
@@ -67,35 +68,30 @@ rasa run actions
 ## Fluxo tecnico
 
 1. `index.html` carrega `script.js`.
-2. O visitante cria uma conta ou entra em uma conta existente.
-3. Os dados da conta sao gravados no `localStorage`.
-4. O usuario preenche renda, gastos e perfil de investidor.
-5. `script.js` calcula o diagnostico financeiro e atualiza a tela.
-6. O link para `chat.html` abre o assistente.
-7. `chat.js` carrega o historico e envia perguntas ao Rasa; se o servidor estiver indisponivel, usa respostas locais baseadas no perfil.
+2. Cadastro e login sao autenticados pelo Supabase; o perfil financeiro e salvo na tabela `perfis`.
+3. `script.js` calcula o diagnostico a partir da renda, dos gastos fixos e do perfil de investidor.
+4. O link para `chat.html` abre o assistente para usuarios autenticados.
+5. `chat.js` carrega `historico_chat`, envia mensagens ao Rasa e renderiza texto ou graficos. Se a chamada falhar, usa respostas locais por palavras-chave.
 
 ## Persistencia local
 
-O prototipo usa estas chaves do `localStorage`:
+Somente a preferencia visual e gravada diretamente no `localStorage`:
 
 | Chave | Conteudo |
 | --- | --- |
-| `organizamais_usuarios` | Objeto com as contas e os dados de cada usuario. |
-| `organizamais_sessao` | E-mail do usuario atualmente autenticado. |
-| `organizamais_chat_<email>` | Historico de mensagens do chat daquele usuario. |
 | `aurafinance_theme` | Tema selecionado, `light` ou `dark`. |
 
-Para limpar os dados durante o desenvolvimento, use as ferramentas do navegador em **Application/Storage > Local Storage** ou execute no console:
+Contas e sessoes ficam no Supabase Auth; perfis e historicos ficam nas tabelas `perfis` e `historico_chat`. Para redefinir apenas o tema durante o desenvolvimento, execute no console:
 
 ```javascript
-localStorage.clear();
+localStorage.removeItem('aurafinance_theme');
 ```
 
-Essa operacao remove contas, sessao, preferencias e historico locais.
+Sair da conta nao apaga o perfil nem o historico remoto.
 
 ## Como alterar o motor de respostas
 
-As respostas ficam na funcao `gerarRespostaFinanceira` em `chat.js`. O motor identifica palavras-chave e seleciona uma intencao. Para adicionar um novo tipo de resposta:
+As respostas do modo local ficam na funcao `gerarRespostaFinanceira` em `chat.js`; ela e usada quando o webhook Rasa falha. Para adicionar uma resposta local:
 
 1. Crie uma nova condicao com as palavras-chave desejadas.
 2. Leia os dados do usuario pelas variaveis ja calculadas, como `renda`, `gastos` e `margemLivre`.
@@ -103,6 +99,8 @@ As respostas ficam na funcao `gerarRespostaFinanceira` em `chat.js`. O motor ide
 4. Insira a nova condicao antes da resposta geral.
 5. Adicione uma pergunta de exemplo em `chat.html`, se a funcionalidade merecer um atalho.
 6. Teste com perfil preenchido e tambem com renda ou gastos ausentes.
+
+Para respostas processadas pelo Rasa, atualize a intencao em `organiza-rasa/data/nlu.yml`, a regra ou historia correspondente, a acao em `organiza-rasa/actions/actions.py` e o dominio. Treine um novo modelo e teste com os dois servidores ativos.
 
 O fluxo de Rasa e configurado em `organiza-rasa/`. O front-end espera o servidor de conversas na porta `5005` e o servidor de acoes na porta `5055`.
 
@@ -138,17 +136,18 @@ Ao alterar esses valores, valide se a soma dos percentuais representa a regra fi
 - Enviar uma pergunta pelo botao, por `Enter` e por uma pergunta rapida.
 - Testar `Shift + Enter` para quebra de linha.
 - Confirmar respostas de teto, investimentos, reserva, economia e simulacao.
+- Testar perguntas processadas pelo Rasa e a alternativa local com os servidores desligados.
+- Confirmar a exibicao, interacao e download dos graficos de teto, alocacao e simulacao.
 - Limpar o historico e confirmar a acao.
 - Verificar o layout em uma janela estreita.
 
 ## Limitacoes atuais
 
-- Os dados ficam somente no navegador e nao sao sincronizados entre dispositivos.
-- A autenticacao e adequada apenas para demonstracao local; nao substitui um back-end seguro.
-- O motor de respostas usa regras e palavras-chave, nao um modelo de IA conectado.
-- Graficos visuais e comparacoes historicas ainda dependem de uma futura camada de dados estruturados.
+- A autenticacao e a persistencia dependem do projeto Supabase e de politicas RLS configuradas corretamente.
+- A classificacao de intencoes e os graficos do assistente dependem dos servidores Rasa (portas `5005` e `5055`); o fallback local e limitado a palavras-chave.
+- O assistente nao usa um modelo de linguagem generativo e nao mantem historico de transacoes ou comparacoes entre periodos.
 - O sistema nao deve ser usado como substituto de orientacao financeira profissional.
 
 ## Documentacao complementar
 
-Consulte [documentacao.md](documentacao.md) para a proposta do sistema, os fluxogramas e o manual voltado ao usuario final.
+Consulte [documentacao.md](documentacao.md) para o manual do usuario, os fluxos, a arquitetura e os requisitos de configuracao.

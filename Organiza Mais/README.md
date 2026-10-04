@@ -7,7 +7,7 @@
 
 O Organiza+ e um prototipo web de planejamento financeiro pessoal. A aplicacao permite criar um perfil, informar renda e gastos fixos, receber um diagnostico financeiro e conversar com um assistente que gera respostas personalizadas.
 
-O projeto e executado no navegador com HTML, CSS e JavaScript puro. Atualmente nao existe servidor, banco de dados ou pipeline de build.
+O front-end e executado no navegador com HTML, CSS e JavaScript. A autenticacao e a persistencia usam Supabase; o assistente pode se conectar ao servidor Rasa incluido em `organiza-rasa/` e mantem respostas locais como alternativa.
 
 ## Requisitos
 
@@ -17,7 +17,7 @@ O projeto e executado no navegador com HTML, CSS e JavaScript puro. Atualmente n
 
 ## Executar localmente
 
-Na raiz do projeto, inicie um servidor HTTP simples. Com Python instalado:
+Na raiz desta pasta, inicie um servidor HTTP simples. Com Python instalado:
 
 ```bash
 python3 -m http.server 8000
@@ -25,7 +25,28 @@ python3 -m http.server 8000
 
 Depois, abra `http://localhost:8000` no navegador. A entrada da aplicacao e `index.html`.
 
-Tambem e possivel usar a extensao Live Server do VS Code ou outro servidor estatico equivalente.
+Tambem e possivel usar a extensao Live Server do VS Code ou outro servidor estatico equivalente. Abra `http://localhost:8000`.
+
+## Executar o Rasa
+
+O servidor Rasa habilita respostas do assistente e graficos. O projeto usa Rasa 3.6.21, Python 3.10 e o SDK 3.6.2. Se o servidor nao estiver disponivel, o chat usa o motor local de respostas.
+
+Em um terminal, entre em `organiza-rasa`, ative o ambiente Python onde Rasa foi instalado e inicie o servidor:
+
+```bash
+cd organiza-rasa
+source ~/.venvs/organiza-rasa/bin/activate
+rasa train
+rasa run --enable-api --cors "*" --port 5005
+```
+
+Em outro terminal, no mesmo diretorio e ambiente, inicie as acoes personalizadas:
+
+```bash
+cd organiza-rasa
+source ~/.venvs/organiza-rasa/bin/activate
+rasa run actions
+```
 
 ## Estrutura do projeto
 
@@ -40,6 +61,8 @@ Tambem e possivel usar a extensao Live Server do VS Code ou outro servidor estat
 | `img/` | Imagens utilizadas pela interface. |
 | `documentacao.md` | Proposta do sistema, fluxos e manual de utilizacao. |
 | `PDF/` | Materiais complementares do projeto. |
+| `organiza-rasa/` | Configuracao, dados, modelos e acoes personalizadas do chatbot Rasa. |
+| `LICENSE` | Licenca MIT do projeto. |
 
 ## Fluxo tecnico
 
@@ -49,7 +72,7 @@ Tambem e possivel usar a extensao Live Server do VS Code ou outro servidor estat
 4. O usuario preenche renda, gastos e perfil de investidor.
 5. `script.js` calcula o diagnostico financeiro e atualiza a tela.
 6. O link para `chat.html` abre o assistente.
-7. `chat.js` recupera o usuario atual, carrega o historico e calcula respostas com base nos dados do perfil.
+7. `chat.js` carrega o historico e envia perguntas ao Rasa; se o servidor estiver indisponivel, usa respostas locais baseadas no perfil.
 
 ## Persistencia local
 
@@ -81,7 +104,7 @@ As respostas ficam na funcao `gerarRespostaFinanceira` em `chat.js`. O motor ide
 5. Adicione uma pergunta de exemplo em `chat.html`, se a funcionalidade merecer um atalho.
 6. Teste com perfil preenchido e tambem com renda ou gastos ausentes.
 
-O fluxo de RASA descrito em `documentacao.md` e conceitual. O prototipo atual processa as mensagens localmente em JavaScript e ainda nao possui integracao com um servidor RASA.
+O fluxo de Rasa e configurado em `organiza-rasa/`. O front-end espera o servidor de conversas na porta `5005` e o servidor de acoes na porta `5055`.
 
 ## Perfis financeiros
 

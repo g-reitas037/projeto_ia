@@ -1,0 +1,109 @@
+version: "3.1"
+
+nlu:
+- intent: saudacao
+  examples: |
+    - oi
+    - olá
+    - bom dia
+    - boa tarde
+    - boa noite
+    - e aí
+
+- intent: perguntar_teto_gastos
+  examples: |
+    - Qual é o meu teto de gastos livres?
+    - Quanto posso gastar este mês?
+    - Qual meu limite para gastos variáveis?
+    - Meu teto de gastos
+    - Quanto sobra pra eu gastar?
+
+- intent: perguntar_alocacao_investimentos
+  examples: |
+    - Como devo alocar minha reserva e investimentos?
+    - Onde devo investir segundo meu perfil?
+    - Qual a melhor carteira para mim?
+    - Como investir minha margem livre?
+    - Alocação recomendada
+
+- intent: perguntar_reserva_emergencia
+  examples: |
+    - Quanto preciso ter na reserva de emergência?
+    - Qual o valor ideal da minha reserva?
+    - Reserva de emergência
+    - Quanto devo guardar para emergências?
+
+- intent: perguntar_como_economizar
+  examples: |
+    - Como posso cortar gastos?
+    - Dicas para economizar dinheiro
+    - Como reduzir meus gastos fixos?
+    - Quero economizar mais
+
+- intent: perguntar_simulacao_poupanca
+  examples: |
+    - Simule quanto consigo acumular em 6 meses
+    - Quanto terei guardado em 1 ano?
+    - Simulação de poupança
+    - Quanto vou ter daqui a 2 anos guardando minha meta?
+
+- intent: despedida
+  examples: |
+    - tchau
+    - até logo
+    - obrigado
+    - valeu
+    - falou
+
+- intent: perguntar_comparativo
+  examples: |
+    - Me mostre um comparativo da minha renda e gastos
+    - Compare minha renda com meus gastos
+    - Gráfico do meu orçamento
+    - Como está distribuído meu orçamento?
+
+- intent: perguntar_controle_variavel
+  examples: |
+    - Como devo controlar meus gastos variáveis?
+    - Como controlar meus gastos variáveis?
+    - Dicas para gastos variáveis
+
+- intent: perguntar_investir_poupanca
+  examples: |
+    - Como devo investir minha meta de poupança?
+    - Onde investir a meta de poupança?
+    - Como investir o que eu guardo todo mês?
+
+- intent: perguntar_conceito
+  examples: |
+    - O que é CDB?
+    - O que significa CDI?
+    - Me explica o que é FII
+    - O que é Tesouro Selic?
+    - O que é reserva de emergência?
+    - O que significa liquidez diária?
+    - O que é IPCA?
+    - Explica o que é renda fixa
+    - Me explica renda variável
+    - O que é um ETF?
+    - O que é Tesouro Direto?
+    - O que é juros compostos?
+    - Pode me explicar o que significa Selic?
+    - O que quer dizer CDI?
+    - Não sei o que é FII, me explica
+
+- intent: perguntar_posso_comprar
+  examples: |
+    - Posso comprar um celular de 3000 reais?
+    - Consigo comprar uma TV de 2500?
+    - Cabe no meu orçamento uma viagem de 4000?
+    - Posso gastar 800 em uma bicicleta?
+    - Vale a pena comprar um notebook de 5000?
+    - É possível comprar um carro de 30000?
+    - Tenho como comprar um tênis de 400?
+    - Cabe uma geladeira de 3200 no meu orçamento?
+    - Posso comprar um celular de 4500?
+    - Consigo gastar 1200 em um curso?
+    - Dá pra comprar uma passagem de 1800?
+    - Posso comprar isso por 500?
+    - Cabe uma compra de 2000?

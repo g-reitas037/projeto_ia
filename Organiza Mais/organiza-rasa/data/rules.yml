@@ -1,0 +1,67 @@
+version: "3.1"
+
+rules:
+- rule: Responder saudação
+  steps:
+  - intent: saudacao
+  - action: action_saudacao
+
+- rule: Responder despedida
+  steps:
+  - intent: despedida
+  - action: utter_despedida
+
+- rule: Teto de gastos
+  steps:
+  - intent: perguntar_teto_gastos
+  - action: action_teto_gastos
+
+- rule: Alocação de investimentos
+  steps:
+  - intent: perguntar_alocacao_investimentos
+  - action: action_alocacao_investimentos
+
+- rule: Reserva de emergência
+  steps:
+  - intent: perguntar_reserva_emergencia
+  - action: action_reserva_emergencia
+
+- rule: Dicas para economizar
+  steps:
+  - intent: perguntar_como_economizar
+  - action: action_dicas_economia
+
+- rule: Simulação de poupança
+  steps:
+  - intent: perguntar_simulacao_poupanca
+  - action: action_simulacao_poupanca
+
+- rule: Controle de gastos variáveis
+  steps:
+  - intent: perguntar_controle_variavel
+  - action: action_teto_gastos
+
+- rule: Investir meta de poupança
+  steps:
+  - intent: perguntar_investir_poupanca
+  - action: action_alocacao_investimentos
+
+- rule: Fallback
+  steps:
+  - intent: nlu_fallback
+  - action: utter_fallback
+
+- rule: Comparativo do orçamento
+  steps:
+  - intent: perguntar_comparativo
+  - action: action_comparativo
+
+- rule: Explicar conceito financeiro
+  steps:
+  - intent: perguntar_conceito
+  - action: action_conceito
+
+- rule: Analisar se uma compra cabe no orçamento
+  steps:
+  - intent: perguntar_posso_comprar
+  - action: action_posso_comprar

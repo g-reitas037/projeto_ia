@@ -1,0 +1,67 @@
+{
+  "type": "MaxHistoryTrackerFeaturizer",
+  "state_featurizer": {
+    "action_texts": [],
+    "entity_tag_specs": [],
+    "feature_states": {
+      "intent": {
+        "back": 0,
+        "despedida": 1,
+        "nlu_fallback": 2,
+        "out_of_scope": 3,
+        "perguntar_alocacao_investimentos": 4,
+        "perguntar_como_economizar": 5,
+        "perguntar_comparativo": 6,
+        "perguntar_conceito": 7,
+        "perguntar_controle_variavel": 8,
+        "perguntar_investir_poupanca": 9,
+        "perguntar_posso_comprar": 10,
+        "perguntar_reserva_emergencia": 11,
+        "perguntar_simulacao_poupanca": 12,
+        "perguntar_teto_gastos": 13,
+        "restart": 14,
+        "saudacao": 15,
+        "session_start": 16
+      },
+      "action_name": {
+        "action_listen": 0,
+        "action_restart": 1,
+        "action_session_start": 2,
+        "action_default_fallback": 3,
+        "action_deactivate_loop": 4,
+        "action_revert_fallback_events": 5,
+        "action_default_ask_affirmation": 6,
+        "action_default_ask_rephrase": 7,
+        "action_two_stage_fallback": 8,
+        "action_unlikely_intent": 9,
+        "action_back": 10,
+        "...": 11,
+        "action_extract_slots": 12,
+        "action_teto_gastos": 13,
+        "action_alocacao_investimentos": 14,
+        "action_reserva_emergencia": 15,
+        "action_dicas_economia": 16,
+        "action_simulacao_poupanca": 17,
+        "action_comparativo": 18,
+        "action_saudacao": 19,
+        "action_conceito": 20,
+        "action_posso_comprar": 21,
+        "utter_despedida": 22,
+        "utter_fallback": 23,
+        "utter_saudacao": 24
+      },
+      "entities": {
+        "item": 0,
+        "valor": 1
+      },
+      "slots": {
+        "valor_0": 0,
+        "valor_1": 1,
+        "item_0": 2
+      },
+      "active_loop": {}
+    }
+  },
+  "remove_duplicates": true,
+  "max_history": 5
+}

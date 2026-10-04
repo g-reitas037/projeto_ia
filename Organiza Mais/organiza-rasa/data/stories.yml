@@ -1,0 +1,8 @@
+version: "3.1"
+
+stories:
+
+- story: fluxo de despedida
+  steps:
+  - intent: despedida
+  - action: utter_despedida

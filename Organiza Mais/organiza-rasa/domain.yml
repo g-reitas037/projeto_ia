@@ -1,0 +1,57 @@
+version: "3.1"
+
+intents:
+  - saudacao
+  - despedida
+  - perguntar_teto_gastos
+  - perguntar_alocacao_investimentos
+  - perguntar_reserva_emergencia
+  - perguntar_como_economizar
+  - perguntar_simulacao_poupanca
+  - perguntar_comparativo
+  - perguntar_controle_variavel       
+  - perguntar_investir_poupanca  
+  - nlu_fallback
+  - perguntar_conceito
+  - perguntar_posso_comprar
+
+entities:
+  - valor
+  - item
+
+slots:
+  valor:
+    type: float
+    mappings:
+      - type: from_entity
+        entity: valor
+  item:
+    type: text
+    mappings:
+      - type: from_entity
+        entity: item
+
+responses:
+  utter_saudacao:
+    - text: "Olá! 👋 Sou a IA da Organiza+. Posso te ajudar com seu teto de gastos, reserva de emergência, investimentos e dicas para economizar. O que você quer saber?"
+
+  utter_despedida:
+    - text: "Até logo! Continue firme na organização das suas finanças. 💪"
+
+  utter_fallback:
+    - text: "Desculpe, não entendi. Você pode me perguntar sobre: teto de gastos, como investir, reserva de emergência, dicas para economizar ou simulação de poupança."
+
+actions:
+  - action_teto_gastos
+  - action_alocacao_investimentos
+  - action_reserva_emergencia
+  - action_dicas_economia
+  - action_simulacao_poupanca
+  - action_comparativo
+  - action_saudacao
+  - action_conceito
+  - action_posso_comprar
+
+session_config:
+  session_expiration_time: 60
+  carry_over_slots_to_new_session: true

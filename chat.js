@@ -9,6 +9,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // ---------------------------------------------------------
   const CHAVE_TEMA = 'aurafinance_theme';
 
+  const RASA_URL = "http://localhost:5005/webhooks/rest/webhook";
+
   const PERFIS_CONFIG = {
     conservador: {
       nome: 'Conservador',
@@ -57,39 +59,352 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const $ = (id) => document.getElementById(id);
 
+// ---------------------------------------------------------
+// MOTOR DE GRÁFICOS INTERATIVOS (Chart.js)
+// ---------------------------------------------------------
+const graficosRenderizados = new Map();
+const chartsAtivos = new Map();
+const MARCADOR_MENSAGEM_COM_GRAFICOS = '__ORGANIZA_CHAT_GRAFICOS_V1__';
+
+function serializarMensagemComGraficos(textoHtml, graficos) {
+  return `${MARCADOR_MENSAGEM_COM_GRAFICOS}${JSON.stringify({ textoHtml, graficos })}`;
+}
+
+function desserializarMensagemComGraficos(conteudo) {
+  if (typeof conteudo !== 'string') return null;
+  if (!conteudo.startsWith(MARCADOR_MENSAGEM_COM_GRAFICOS)) return null;
+
+  try {
+    const mensagem = JSON.parse(conteudo.slice(MARCADOR_MENSAGEM_COM_GRAFICOS.length));
+    if (!Array.isArray(mensagem.graficos)) {
+      throw new Error('A lista de gráficos persistidos é inválida.');
+    }
+    return mensagem;
+  } catch (erro) {
+    console.error('Não foi possível restaurar os gráficos do histórico:', erro);
+    return null;
+  }
+}
+
+function corTema(varName, fallback) {
+  const v = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+  return v || fallback;
+}
+
+function criarGrafico(container, spec) {
+  const canvas = document.createElement('canvas');
+  container.appendChild(canvas);
+
+  const textoPrincipal = corTema('--texto-principal', '#122218');
+  const textoSecundario = corTema('--texto-secundario', '#4b6154');
+  const borda = corTema('--borda', 'rgba(0,0,0,0.1)');
+
+  const optsBase = {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: { duration: 600, easing: 'easeOutQuart' },
+    plugins: {
+      legend: {
+        labels: {
+          color: textoPrincipal,
+          font: { family: 'Plus Jakarta Sans', size: 12, weight: '600' },
+          boxWidth: 12,
+          padding: 12
+        }
+      },
+      tooltip: {
+        backgroundColor: 'rgba(0,0,0,0.85)',
+        titleFont: { family: 'Plus Jakarta Sans', weight: '700' },
+        bodyFont: { family: 'Plus Jakarta Sans' },
+        padding: 10,
+        cornerRadius: 8
+      }
+    }
+  };
+
+  const escala = {
+    x: {
+      ticks: { color: textoSecundario, font: { family: 'Plus Jakarta Sans', size: 11 } },
+      grid: { color: borda, display: false }
+    },
+    y: {
+      ticks: { color: textoSecundario, font: { family: 'Plus Jakarta Sans', size: 11 } },
+      grid: { color: borda, drawBorder: false }
+    }
+  };
+
+  const onClick = (evt, elements) => {
+    if (!elements.length) return;
+    const el = elements[0];
+    const label = spec.data.labels[el.index];
+    const msg = spec.clickMessages?.[label];
+    if (msg && typeof enviarMensagem === 'function') {
+      enviarMensagem(msg);
+    }
+  };
+
+  const interatividadeCursor = spec.clickMessages
+    ? { onHover: (e, els) => { e.native.target.style.cursor = els.length ? 'pointer' : 'default'; } }
+    : {};
+
+  let options;
+  switch (spec.chart_type) {
+    case 'doughnut':
+    case 'pie':
+      options = {
+        ...optsBase,
+        cutout: spec.chart_type === 'doughnut' ? '62%' : 0,
+        onClick,
+        ...interatividadeCursor
+      };
+      break;
+    case 'line':
+      options = {
+        ...optsBase,
+        scales: escala,
+        elements: { line: { borderWidth: 2 } },
+        onClick,
+        ...interatividadeCursor
+      };
+      break;
+    case 'bar':
+    default:
+      options = { ...optsBase, scales: escala, onClick, ...interatividadeCursor };
+      break;
+  }
+
+  const instancia = new Chart(canvas, {
+    type: spec.chart_type || 'bar',
+    data: spec.data,
+    options
+  });
+
+  canvas._specOriginal = spec;
+  chartsAtivos.set(canvas, instancia);
+  return instancia;
+}
+
+function gerarImagemGrafico(container, spec) {
+  const canvas = document.createElement('canvas');
+  container.appendChild(canvas);
+
+  const textoPrincipal = corTema('--texto-principal', '#122218');
+  const textoSecundario = corTema('--texto-secundario', '#4b6154');
+  const borda = corTema('--borda', 'rgba(0,0,0,0.1)');
+
+  const optsBase = {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: { duration: 600, easing: 'easeOutQuart' },
+    plugins: {
+      legend: {
+        labels: {
+          color: textoPrincipal,
+          font: { family: 'Plus Jakarta Sans', size: 12, weight: '600' },
+          boxWidth: 12,
+          padding: 12
+        }
+      },
+      tooltip: {
+        backgroundColor: 'rgba(0,0,0,0.85)',
+        titleFont: { family: 'Plus Jakarta Sans', weight: '700' },
+        bodyFont: { family: 'Plus Jakarta Sans' },
+        padding: 10,
+        cornerRadius: 8
+      }
+    }
+  };
+
+  const escala = {
+    x: {
+      ticks: { color: textoSecundario, font: { family: 'Plus Jakarta Sans', size: 11 } },
+      grid: { color: borda, display: false }
+    },
+    y: {
+      ticks: { color: textoSecundario, font: { family: 'Plus Jakarta Sans', size: 11 } },
+      grid: { color: borda, drawBorder: false }
+    }
+  };
+
+  let options;
+  switch (spec.chart_type) {
+    case 'doughnut':
+    case 'pie':
+      options = { ...optsBase, cutout: spec.chart_type === 'doughnut' ? '62%' : 0 };
+      break;
+    case 'line':
+      options = { ...optsBase, scales: escala, elements: { line: { borderWidth: 2 } } };
+      break;
+    case 'bar':
+    default:
+      options = { ...optsBase, scales: escala };
+      break;
+  }
+
+  const instancia = new Chart(canvas, {
+    type: spec.chart_type || 'bar',
+    data: spec.data,
+    options
+  });
+
+  const imagemExistente = container.querySelector('.msg-chart-image');
+  const imagemGrafico = imagemExistente || new Image();
+  imagemGrafico.className = 'msg-chart-image';
+  imagemGrafico.alt = spec.title ? `Gráfico: ${spec.title}` : 'Gráfico da conversa';
+  imagemGrafico.src = canvas.toDataURL('image/png');
+  instancia.destroy();
+
+  if (!imagemExistente) {
+    container.replaceChildren(imagemGrafico);
+  }
+  graficosRenderizados.set(imagemGrafico, spec);
+  return imagemGrafico;
+}
+
+function renderizarBlocoGrafico(spec) {
+  const wrap = document.createElement('div');
+  wrap.className = 'msg-chart-wrap';
+
+  // ---- Cabeçalho: título + botão de download ----
+  const header = document.createElement('div');
+  header.className = 'msg-chart-header';
+
+  const titulo = document.createElement('div');
+  titulo.className = 'msg-chart-title';
+  titulo.textContent = spec.title || 'Gráfico';
+  header.appendChild(titulo);
+
+  const btnBaixar = document.createElement('button');
+  btnBaixar.type = 'button';
+  btnBaixar.className = 'msg-chart-download';
+  btnBaixar.title = 'Baixar como imagem';
+  btnBaixar.innerHTML = `
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+      <polyline points="7 10 12 15 17 10"></polyline>
+      <line x1="12" y1="15" x2="12" y2="3"></line>
+    </svg>
+  `;
+  header.appendChild(btnBaixar);
+
+  wrap.appendChild(header);
+
+  // ---- Área onde o canvas será desenhado ----
+  const holder = document.createElement('div');
+  holder.className = 'msg-chart-canvas-holder';
+  wrap.appendChild(holder);
+
+  // ---- Cria o gráfico e liga o botão de download ----
+  requestAnimationFrame(() => {
+    const chart = criarGrafico(holder, spec);
+
+    btnBaixar.addEventListener('click', () => {
+      try {
+        const dataUrl = chart.toBase64Image('image/png', 1);
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = `organiza-mais-${(spec.title || 'grafico')
+          .toLowerCase()
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '')  // remove acentos
+          .replace(/[^a-z0-9]+/g, '-')} .png`.replace(/\s/g, '');
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        if (typeof mostrarToast === 'function') {
+          mostrarToast('Imagem do gráfico baixada.');
+        }
+      } catch (e) {
+        console.error('Erro ao exportar gráfico:', e);
+      }
+    });
+  });
+
+  return wrap;
+}
+
+function extrairEspecificacaoGrafico(mensagem) {
+  let conteudo = mensagem.custom ?? mensagem.json_message ?? mensagem;
+
+  if (typeof conteudo === 'string') {
+    try {
+      conteudo = JSON.parse(conteudo);
+    } catch (erro) {
+      console.warn('Payload de gráfico recebido em formato inválido:', erro);
+      return null;
+    }
+  }
+
+  return conteudo && conteudo.type === 'chart' ? conteudo : null;
+}
+
   // ---------------------------------------------------------
   // 1. GERENCIAMENTO DE SESSÃO DO USUÁRIO (SUPABASE)
   // ---------------------------------------------------------
   let usuario = null;
 
-  async function inicializarChatbot() {
-    const { data: { user } } = await _supabase.auth.getUser();
+  async function atualizarPerfilUsuario() {
+    const { data: { user }, error: erroUsuario } = await _supabase.auth.getUser();
+    if (erroUsuario) throw erroUsuario;
+
     if (!user) {
       window.location.replace('index.html');
-      return;
+      return false;
     }
 
-    const { data: perfilData } = await _supabase
+    const { data: perfilData, error: erroPerfil } = await _supabase
       .from('perfis')
       .select('*')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
+
+    if (erroPerfil) {
+      console.error('Erro ao carregar dados do perfil; usando dados disponíveis na sessão:', erroPerfil);
+    }
+
+    const metadados = user.user_metadata || {};
+    const renda = Number(perfilData?.renda ?? metadados.renda ?? 0);
+    const gastosFixos = Number(perfilData?.gastos_fixos ?? metadados.gastos_fixos ?? metadados.gastosFixos ?? 0);
 
     usuario = {
       id: user.id,
       email: user.email,
-      nome: perfilData ? perfilData.nome : 'Usuário',
-      perfil: perfilData ? perfilData.perfil : 'moderado',
-      renda: perfilData ? perfilData.renda : 0,
-      gastosFixos: perfilData ? perfilData.gastos_fixos : 0,
-      foto: perfilData ? perfilData.foto : null
+      nome: perfilData?.nome || metadados.nome || 'Usuário',
+      perfil: perfilData?.perfil || metadados.perfil || 'moderado',
+      renda: Number.isFinite(renda) ? renda : 0,
+      gastosFixos: Number.isFinite(gastosFixos) ? gastosFixos : 0,
+      foto: perfilData?.foto || metadados.foto || null
     };
 
     renderizarPerfilSidebar();
+    return true;
+  }
+
+  async function inicializarChatbot() {
+    try {
+      if (!await atualizarPerfilUsuario()) return;
+    } catch (erro) {
+      console.error('Erro ao carregar perfil do usuário:', erro);
+      return;
+    }
+
     await carregarHistoricoChat();
   }
 
   inicializarChatbot();
+
+  async function atualizarPerfilAoRetornar() {
+    if (document.visibilityState !== 'visible') return;
+
+    try {
+      await atualizarPerfilUsuario();
+    } catch (erro) {
+      console.error('Erro ao atualizar perfil do usuário:', erro);
+    }
+  }
+
+  document.addEventListener('visibilitychange', atualizarPerfilAoRetornar);
+  window.addEventListener('pageshow', atualizarPerfilAoRetornar);
 
   // ---------------------------------------------------------
   // 2. TEMA CLARO / ESCURO (SINCRONIZADO)
@@ -107,6 +422,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const novoTema = temaAtual === 'dark' ? 'light' : 'dark';
       htmlElement.setAttribute('data-theme', novoTema);
       try { localStorage.setItem(CHAVE_TEMA, novoTema); } catch (e) {}
+      // Recria as imagens para manter as cores do gráfico sincronizadas ao tema.
+      requestAnimationFrame(() => {
+        graficosRenderizados.forEach((spec, imagem) => {
+          if (imagem.isConnected) criarGrafico(imagem.parentElement, spec);
+        });
+      });
     });
   }
 
@@ -224,23 +545,46 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderizarMensagem(msg, animar = true) {
-    const isUser = msg.remetente === 'user';
-    const row = document.createElement('div');
-    row.className = `message-row ${isUser ? 'user' : 'bot'}`;
-    if (!animar) row.style.animation = 'none';
+  const isUser = msg.remetente === 'user';
+  const row = document.createElement('div');
+  row.className = `message-row ${isUser ? 'user' : 'bot'}`;
+  if (!animar) row.style.animation = 'none';
 
-    const hora = new Date(msg.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const hora = new Date(msg.timestamp || Date.now())
+    .toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-    row.innerHTML = `
-      <div class="message-avatar">${isUser ? iniciais(usuario.nome) : '🤖'}</div>
-      <div class="message-content-wrap">
-        <div class="message-bubble">${msg.textoHtml}</div>
-        <span class="message-time">${hora}</span>
-      </div>
-    `;
+  const avatar = document.createElement('div');
+  avatar.className = 'message-avatar';
+  avatar.textContent = isUser ? iniciais(usuario.nome) : '🤖';
 
-    messagesContainer.appendChild(row);
+  const wrap = document.createElement('div');
+  wrap.className = 'message-content-wrap';
+  if (msg.chartSpec) wrap.classList.add('message-content-wrap--chart');
+
+  const bubble = document.createElement('div');
+  bubble.className = 'message-bubble';
+
+  if (msg.textoHtml) {
+    const texto = document.createElement('div');
+    texto.innerHTML = msg.textoHtml;
+    bubble.appendChild(texto);
   }
+
+  if (msg.chartSpec) {
+    bubble.appendChild(renderizarBlocoGrafico(msg.chartSpec));
+  }
+
+  const time = document.createElement('span');
+  time.className = 'message-time';
+  time.textContent = hora;
+
+  wrap.appendChild(bubble);
+  wrap.appendChild(time);
+
+  row.appendChild(avatar);
+  row.appendChild(wrap);
+  messagesContainer.appendChild(row);
+}
 
   function exibirIndicadorDigitacao() {
     const row = document.createElement('div');
@@ -287,6 +631,19 @@ document.addEventListener('DOMContentLoaded', () => {
     if (historico && historico.length > 0) {
       if (chatWelcome) chatWelcome.style.display = 'none';
       historico.forEach((m) => {
+        const mensagemSalva = desserializarMensagemComGraficos(m.texto_html);
+        if (mensagemSalva) {
+          mensagemSalva.graficos.forEach((chartSpec, index) => {
+            renderizarMensagem({
+              remetente: m.remetente,
+              textoHtml: index === 0 ? mensagemSalva.textoHtml : '',
+              chartSpec,
+              timestamp: new Date(m.created_at).getTime()
+            }, false);
+          });
+          return;
+        }
+
         renderizarMensagem({
           remetente: m.remetente,
           textoHtml: m.texto_html,
@@ -297,45 +654,51 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  async function salvarMensagemNoBanco(remetente, textoHtml) {
-    if (!usuario) return;
-    
-    const { error } = await _supabase.from('historico_chat').insert([
-      {
-        user_id: usuario.id,
-        remetente: remetente,
-        texto_html: textoHtml
-      }
-    ]);
+  let filaSalvamentoChat = Promise.resolve();
 
-    if (error) {
-      console.error('Erro ao salvar no banco:', error);
+  function salvarMensagemNoBanco(remetente, textoHtml) {
+    if (!usuario) return filaSalvamentoChat;
+
+    const userId = usuario.id;
+    filaSalvamentoChat = filaSalvamentoChat
+      .then(async () => {
+        const { error } = await _supabase.from('historico_chat').insert([
+          {
+            user_id: userId,
+            remetente,
+            texto_html: textoHtml
+          }
+        ]);
+
+        if (error) throw error;
+      })
+      .catch((erro) => {
+        console.error('Erro ao salvar mensagem no histórico:', erro);
+      });
+
+    return filaSalvamentoChat;
+  }
+
+ if (btnLimparChat) {
+  btnLimparChat.addEventListener('click', async () => {
+    if (confirm('Deseja realmente limpar toda a conversa com o assistente?')) {
+      await _supabase.from('historico_chat').delete().eq('user_id', usuario.id);
+
+      graficosRenderizados.clear();
+
+      const rows = messagesContainer.querySelectorAll('.message-row');
+      rows.forEach((r) => r.remove());
+      if (chatWelcome) chatWelcome.style.display = '';
+      mostrarToast('Histórico de mensagens limpo com sucesso.');
     }
-  }
-
-  if (btnLimparChat) {
-    btnLimparChat.addEventListener('click', async () => {
-      if (confirm('Deseja realmente limpar toda a conversa com o assistente?')) {
-        await _supabase.from('historico_chat').delete().eq('user_id', usuario.id);
-        
-        const rows = messagesContainer.querySelectorAll('.message-row');
-        rows.forEach((r) => r.remove());
-        if (chatWelcome) chatWelcome.style.display = '';
-        mostrarToast('Histórico de mensagens limpo com sucesso.');
-      }
-    });
-  }
+  });
+}
 
   // ---------------------------------------------------------
   // 7. MOTOR DE RESPOSTAS DA IA
   // ---------------------------------------------------------
   function gerarRespostaFinanceira(pergunta) {
     const textoLower = pergunta.toLowerCase().trim();
-
-    const elTom = $('select-tom');
-    const elFoco = $('select-foco');
-    const tom = elTom ? elTom.value : 'direto';
-    const foco = elFoco ? elFoco.value : 'equilibrado';
 
     const perfilKey = (usuario.perfil || 'moderado').toLowerCase();
     const conf = PERFIS_CONFIG[perfilKey] || PERFIS_CONFIG.moderado;
@@ -420,35 +783,119 @@ document.addEventListener('DOMContentLoaded', () => {
   // 8. ENVIO DE MENSAGENS E EVENTOS
   // ---------------------------------------------------------
   async function enviarMensagem(texto) {
-    const textoLimpo = String(texto || '').trim();
-    if (!textoLimpo) return;
-
-    if (chatWelcome) chatWelcome.style.display = 'none';
-
-    const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-    const textoFormatado = esc(textoLimpo).replace(/\n/g, '<br>');
-
-    renderizarMensagem({ remetente: 'user', textoHtml: textoFormatado, timestamp: Date.now() });
-    scrollChatParaFim();
-    await salvarMensagemNoBanco('user', textoFormatado);
-
-    chatInput.value = '';
-    chatInput.style.height = 'auto';
-
-    exibirIndicadorDigitacao();
-    if (sendBtn) sendBtn.disabled = true;
-
-    setTimeout(async () => {
-      removerIndicadorDigitacao();
-      if (sendBtn) sendBtn.disabled = false;
-
-      const respostaHtml = gerarRespostaFinanceira(textoLimpo);
-
-      renderizarMensagem({ remetente: 'bot', textoHtml: respostaHtml, timestamp: Date.now() });
-      scrollChatParaFim();
-      await salvarMensagemNoBanco('bot', respostaHtml);
-    }, 700);
+  const textoLimpo = String(texto || '').trim();
+  if (!textoLimpo) return;
+  if (!usuario) {
+    console.error('Não foi possível enviar a mensagem antes de carregar o perfil do usuário.');
+    return;
   }
+
+  if (chatWelcome) chatWelcome.style.display = 'none';
+
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+  const textoFormatado = esc(textoLimpo).replace(/\n/g, '<br>');
+
+  // 1. Renderiza mensagem do usuário
+  renderizarMensagem({ remetente: 'user', textoHtml: textoFormatado, timestamp: Date.now() });
+
+  chatInput.value = '';
+  chatInput.style.height = 'auto';
+
+  // 2. Indicador de digitação
+  exibirIndicadorDigitacao();
+  if (sendBtn) sendBtn.disabled = true;
+
+  salvarMensagemNoBanco('user', textoFormatado);
+
+  try {
+  const resposta = await fetch(RASA_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      sender: usuario.id,
+      message: textoLimpo,
+      metadata: {
+        perfil_usuario: {
+          perfil: usuario.perfil,
+          renda: Number(usuario.renda) || 0,
+          gastos_fixos: Number(usuario.gastosFixos) || 0
+        }
+      }
+    })
+  });
+
+  if (!resposta.ok) throw new Error(`HTTP ${resposta.status}`);
+  const dados = await resposta.json();
+
+  removerIndicadorDigitacao();
+  if (sendBtn) sendBtn.disabled = false;
+
+  // Separa textos e gráficos
+  const mensagens = Array.isArray(dados)
+    ? dados
+    : dados?.messages ?? dados?.value;
+  if (!Array.isArray(mensagens)) {
+    throw new Error('O webhook retornou um formato de resposta inválido.');
+  }
+  const textos = mensagens.map(i => i.text).filter(Boolean);
+  const graficos = mensagens
+    .map(extrairEspecificacaoGrafico)
+    .filter(Boolean);
+
+  const respostaTexto = textos.join('\n\n');
+  const respostaHtml = respostaTexto
+    ? esc(respostaTexto).replace(/\n/g, '<br>')
+    : '';
+
+  // Uma bolha por gráfico (para ficar organizado)
+  if (graficos.length === 0) {
+    renderizarMensagem({
+      remetente: 'bot',
+      textoHtml: respostaHtml || 'Não recebi uma resposta válida.',
+      timestamp: Date.now()
+    });
+    if (respostaHtml) salvarMensagemNoBanco('bot', respostaHtml);
+  } else {
+    // Primeira bolha: texto (se houver) + primeiro gráfico
+    renderizarMensagem({
+      remetente: 'bot',
+      textoHtml: respostaHtml,
+      chartSpec: graficos[0],
+      timestamp: Date.now()
+    });
+    // Gráficos extras em bolhas separadas (raro, mas seguro)
+    for (let i = 1; i < graficos.length; i++) {
+      renderizarMensagem({
+        remetente: 'bot',
+        chartSpec: graficos[i],
+        timestamp: Date.now()
+      });
+    }
+    // Persiste apenas o texto no histórico (gráficos são regenerados)
+    salvarMensagemNoBanco(
+      'bot',
+      serializarMensagemComGraficos(respostaHtml, graficos)
+    );
+  }
+
+  scrollChatParaFim();
+
+} catch (erro) {
+  console.warn('Rasa indisponível, usando motor local:', erro);
+  removerIndicadorDigitacao();
+  if (sendBtn) sendBtn.disabled = false;
+
+  const respostaHtml = gerarRespostaFinanceira(textoLimpo);
+  renderizarMensagem({
+    remetente: 'bot',
+    textoHtml: respostaHtml,
+    timestamp: Date.now()
+  });
+  salvarMensagemNoBanco('bot', respostaHtml);
+}
+}
 
   if (chatForm) {
     chatForm.addEventListener('submit', (e) => {
